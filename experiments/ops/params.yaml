@@ -27,8 +27,8 @@ model:
 trainer:
     regime: "levelwise"
     eval_interval: 100
-    train_batch_size: 128
-    eval_batch_size: 256
-    num_steps: 10_000
+    train_batch_size: 40
+    eval_batch_size: 40
+    num_steps: 100
     num_candidates: null
     topk: 100

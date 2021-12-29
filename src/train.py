@@ -17,8 +17,8 @@ from xmlc.metrics import *
 from xmlc.plt import ProbabilisticLabelTree
 from xmlc.dataset import NamedTensorDataset
 from xmlc.utils import build_sparse_tensor
-from src.classifiers import LSTMClassifierFactory
-from src.logger import LogHistory
+from classifiers import LSTMClassifierFactory
+from logger import LogHistory
 
 def compute_metrics(
     preds:torch.LongTensor, 
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     os.makedirs(args.output_dir, exist_ok=True)
     
     # load model and trainer parameters
-    with open("params.yaml", "r") as f:
+    with open(f"./{args.output_dir}/params.yaml", "r") as f:
         params = yaml.load(f.read(), Loader=yaml.SafeLoader)
     
     # load pretrained embedding
