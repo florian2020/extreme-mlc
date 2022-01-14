@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from treelib import Tree
 from torch.utils.data import Dataset, DataLoader
+from lr_scheduler.transformer_lr_scheduler import TransformerLRScheduler
 from dataclasses import dataclass
 from typing import List, Set, Callable
 from .plt import ProbabilisticLabelTree
@@ -12,10 +13,11 @@ from .tree_utils import (
     convert_labels_to_ids
 )
 from .dataset import (
-    MultiLabelDataset, 
+    MultiLabelDataset,
     GroupWeights,
     GroupWeightedMultiLabelDataset
 )
+
 
 @dataclass(frozen=True)
 class InputsAndLabels(object):
@@ -28,22 +30,23 @@ class InputsAndLabels(object):
         n, m = len(self.inputs), len(self.labels)
         assert n == m, "Inputs (%i) and Labels (%i) do not align!" % (n, m)
 
+
 class End2EndTrainerModule(pl.LightningModule):
     """ End-to-End Trainer for probabilistic label tree
         Trains all levels of the tree simultaneously
     """
 
     def __init__(self,
-        tree:Tree,
-        model:ProbabilisticLabelTree,
-        train_data:InputsAndLabels,
-        val_data:InputsAndLabels,
-        num_candidates:int,
-        topk:int,
-        train_batch_size:int,
-        val_batch_size:int,
-        metrics:Callable
-    ) -> None:
+                 tree: Tree,
+                 model: ProbabilisticLabelTree,
+                 train_data: InputsAndLabels,
+                 val_data: InputsAndLabels,
+                 num_candidates: int,
+                 topk: int,
+                 train_batch_size: int,
+                 val_batch_size: int,
+                 metrics: Callable
+                 ) -> None:
         # initialize lightning module
         super().__init__()
         # save arguments
@@ -55,14 +58,30 @@ class End2EndTrainerModule(pl.LightningModule):
         self.val_batch_size = val_batch_size
         # save model
         self.model = model
-        
+
+        # Set optimizer
+        # self.automatic_optimization = False
+        # self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-10)
+        # scheduler = torch.optim.lr_scheduler.LinearLR(
+        #     self.optimizer, start_factor=0.5, total_iters=4)
+
+        # self.scheduler = TransformerLRScheduler(
+        #     optimizer=self.optimizer,
+        #     init_lr=1e-10,
+        #     peak_lr=0.01,
+        #     final_lr=1e-5,
+        #     final_lr_scale=0.05,
+        #     warmup_steps=100,
+        #     decay_steps=200,
+        # )
+
         # create datasets
         self.train_dataset = MultiLabelDataset(
             input_dataset=train_data.inputs,
             labels=train_data.labels,
             label_pool=label_pool,
             num_candidates=num_candidates
-        )        
+        )
         self.val_dataset = MultiLabelDataset(
             input_dataset=val_data.inputs,
             labels=val_data.labels,
@@ -71,7 +90,7 @@ class End2EndTrainerModule(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        return torch.optim.Adam(self.model.parameters(), lr=0)
 
     def train_dataloader(self) -> DataLoader:
         # build the train dataloader
@@ -82,16 +101,25 @@ class End2EndTrainerModule(pl.LightningModule):
         return DataLoader(self.val_dataset, batch_size=self.val_batch_size, shuffle=False, num_workers=4)
 
     def training_step(self, batch, batch_idx):
+
+        # opt = self.optimizers()
+        # opt.zero_grad()
+
         # pop labels from batch and predict
         labels = batch.pop('labels')
         out = self.model(**batch)
         # compute loss and log it
         loss = F.binary_cross_entropy(out.probs[out.mask], labels[out.mask])
+
+        # self.manual_backward(loss)
+        # opt.step()
+        # self.scheduler.step()
+
         self.log("train_loss", loss, on_step=True, prog_bar=False, logger=True)
         # return loss
         return loss
 
-    @torch.no_grad() 
+    @torch.no_grad()
     def validation_step(self, batch, batch_idx):
         # compute validation loss
         # pop labels from batch and predict
@@ -99,7 +127,7 @@ class End2EndTrainerModule(pl.LightningModule):
         out = self.model(**batch)
         # compute loss
         loss = F.binary_cross_entropy(out.probs[out.mask], labels[out.mask])
-        
+
         # compute validation metrics
         candidates = batch.pop("candidates")
         positives = torch.masked_fill(candidates, labels == 0, -1)
@@ -111,23 +139,26 @@ class End2EndTrainerModule(pl.LightningModule):
         preds = output.topk(k=100).candidates
         # return loss, predictions and labels
         return {
-            'loss': loss, 
-            'preds': preds.cpu(), 
+            'loss': loss,
+            'preds': preds.cpu(),
             'targets': positives.cpu()
         }
 
     def validation_epoch_end(self, outputs):
         # compute average loss
-        avg_loss = sum((out['loss'] for out in outputs)) / len(outputs)    
-        self.log("val_loss", avg_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        avg_loss = sum((out['loss'] for out in outputs)) / len(outputs)
+        self.log("val_loss", avg_loss, on_step=False,
+                 on_epoch=True, prog_bar=True, logger=True)
         # concatenate predictions and targets
         preds = torch.cat(tuple(out['preds'] for out in outputs), dim=0)
         targets = torch.cat(tuple(out['targets'] for out in outputs), dim=0)
         # compute metrics
         log_metrics, add_metrics = self.metrics(preds, targets)
         # log metrics
-        self.log_dict(log_metrics, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log_dict(add_metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log_dict(log_metrics, on_step=False,
+                      on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(add_metrics, on_step=False, on_epoch=True,
+                      prog_bar=False, logger=True)
         return avg_loss
 
 
@@ -138,17 +169,17 @@ class LevelTrainerModule(pl.LightningModule):
     """
 
     def __init__(self,
-        level:int,
-        tree:Tree,
-        model:ProbabilisticLabelTree,
-        train_data:InputsAndLabels,
-        val_data:InputsAndLabels,
-        num_candidates:int,
-        topk:int,
-        train_batch_size:int,
-        val_batch_size:int,
-        metrics:Callable
-    ) -> None:
+                 level: int,
+                 tree: Tree,
+                 model: ProbabilisticLabelTree,
+                 train_data: InputsAndLabels,
+                 val_data: InputsAndLabels,
+                 num_candidates: int,
+                 topk: int,
+                 train_batch_size: int,
+                 val_batch_size: int,
+                 metrics: Callable
+                 ) -> None:
         # initialize lightning module
         super().__init__()
         # save arguments
@@ -168,7 +199,17 @@ class LevelTrainerModule(pl.LightningModule):
         self.val_data = val_data
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.classifier.parameters(), lr=1e-3)
+        lr_encoder = 1e-7
+        lr_classification = 1e-3
+        optimizer_config = []
+
+        # Setting same configurations for all levels
+        for classifier in self.model.classifiers:
+            optimizer_config.append(
+                {'params': classifier.enc.parameters(), 'lr': lr_encoder})
+            optimizer_config.append(
+                {'params': classifier.cls.parameters(), 'lr': lr_classification})
+        return torch.optim.Adam(optimizer_config)
 
     def train_dataloader(self) -> DataLoader:
         # build the dataset and the dataloader from it
@@ -187,10 +228,11 @@ class LevelTrainerModule(pl.LightningModule):
         # compute loss and log it
         loss = F.binary_cross_entropy_with_logits(logits, labels)
         self.log("train_loss", loss, on_step=True, prog_bar=False, logger=True)
+
         # return loss
         return loss
 
-    @torch.no_grad() 
+    @torch.no_grad()
     def validation_step(self, batch, batch_idx):
         # compute validation loss
         # pop labels from batch and predict
@@ -198,7 +240,7 @@ class LevelTrainerModule(pl.LightningModule):
         logits = self.classifier(**batch)
         # compute loss
         loss = F.binary_cross_entropy_with_logits(logits, labels)
-        
+
         # compute validation metrics
         candidates = batch.pop("candidates")
         positives = torch.masked_fill(candidates, labels == 0, -1)
@@ -210,33 +252,36 @@ class LevelTrainerModule(pl.LightningModule):
         preds = output.topk(k=100).candidates
         # return loss, predictions and labels
         return {
-            'loss': loss, 
-            'preds': preds.cpu(), 
+            'loss': loss,
+            'preds': preds.cpu(),
             'targets': positives.cpu()
         }
 
     def validation_epoch_end(self, outputs):
         # compute average loss
-        avg_loss = sum((out['loss'] for out in outputs)) / len(outputs)    
-        self.log("val_loss", avg_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        avg_loss = sum((out['loss'] for out in outputs)) / len(outputs)
+        self.log("val_loss", avg_loss, on_step=False,
+                 on_epoch=True, prog_bar=True, logger=True)
         # concatenate predictions and targets
         preds = torch.cat(tuple(out['preds'] for out in outputs), dim=0)
         targets = torch.cat(tuple(out['targets'] for out in outputs), dim=0)
         # compute metrics
         log_metrics, add_metrics = self.metrics(preds, targets)
         # log metrics
-        self.log_dict(log_metrics, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log_dict(add_metrics, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log_dict(log_metrics, on_step=False,
+                      on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(add_metrics, on_step=False, on_epoch=True,
+                      prog_bar=False, logger=True)
         return avg_loss
 
-    def build_dataset(self, data:InputsAndLabels) -> MultiLabelDataset:
-        
+    def build_dataset(self, data: InputsAndLabels) -> MultiLabelDataset:
+
         input_dataset, labels = data.inputs, data.labels
         # build a list of all labels in the current level
         label_pool = set(n.data.level_index for n in self.tree.filter_nodes(
             lambda n: self.tree.level(n.identifier) == (self.level + 1)
         ))
-        
+
         # build training labels for current level
         labels = propagate_labels_to_level(self.tree, labels, level=self.level)
         labels = convert_labels_to_ids(self.tree, labels)
@@ -252,7 +297,8 @@ class LevelTrainerModule(pl.LightningModule):
         else:
             # create dataloader for train input dataset
             # note that the validation-dataloader does not shuffle the dataset
-            loader = DataLoader(input_dataset, batch_size=self.val_batch_size, shuffle=False)
+            loader = DataLoader(
+                input_dataset, batch_size=self.val_batch_size, shuffle=False)
             # get model predictions
             self.model.eval()
             outputs = []
@@ -260,8 +306,10 @@ class LevelTrainerModule(pl.LightningModule):
             with torch.no_grad():
                 for inputs in tqdm(loader, "Building Group Weights"):
                     # apply model and collect all outputs
-                    inputs = {key: tensor.to(self.device) for key, tensor in inputs.items()}
-                    model_out = self.model(**inputs, topk=self.k, restrict_depth=self.level+1)
+                    inputs = {key: tensor.to(self.device)
+                              for key, tensor in inputs.items()}
+                    model_out = self.model(
+                        **inputs, topk=self.k, restrict_depth=self.level+1)
                     outputs.append(model_out.topk(k=self.k).cpu())
             # concatenate all model outputs to build group weights
             weights = GroupWeights(
@@ -274,7 +322,7 @@ class LevelTrainerModule(pl.LightningModule):
                 # map each group to their members
                 # i.e. each node in the current level to it's children
                 group.data.level_index: set(
-                    n.data.level_index 
+                    n.data.level_index
                     for n in self.tree.children(group.identifier)
                 )
                 for group in self.tree.filter_nodes(

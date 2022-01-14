@@ -1,0 +1,33 @@
+preprocess:
+    dataset_path: ./data/datasets/EURLEX57K_full_mil
+    tokenizer: 'all-MiniLM-L6-v2'
+    max_tokens: 100
+    max_instances: 8
+
+label_tree:
+    label_file_path: ./data/datasets/EURLEX57K_full_mil
+    group_id_chars: 0
+
+model:
+    encoder:
+        type: 'sentence-transformer'
+        name: 'all-MiniLM-L6-v2'
+        output_dim: 384
+    dropout: 0.5
+    attention: 
+        type: "softmax-attention"
+    classifier:
+        type: 'intra-bag'
+        bias: true
+        activation: 'relu' 
+        hidden_layers:
+            - 256
+
+trainer:
+    regime: "levelwise"
+    eval_interval: 150
+    train_batch_size: 25
+    eval_batch_size: 200
+    num_steps: 60_000
+    num_candidates: null
+    topk: 100

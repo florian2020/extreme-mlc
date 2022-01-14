@@ -3,15 +3,12 @@ import yaml
 import json
 import torch
 import pickle
-import time
-from datetime import timedelta
 import numpy as np
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 from treelib import Tree
 from typing import Dict, Tuple, List, Any, Callable
 # import attention-xml
-from train_deprecated import train_levelwise, compute_metrics
 from xmlc.trainer import (
     LevelTrainerModule,
     InputsAndLabels
@@ -20,46 +17,8 @@ from xmlc.metrics import *
 from xmlc.plt import ProbabilisticLabelTree
 from xmlc.dataset import NamedTensorDataset
 from xmlc.utils import build_sparse_tensor
-from classifiers import LSTMClassifierFactory, SentenceTransformerFactory
+from classifiers import LSTMClassifierFactory
 from logger import LogHistory
-from transformers import AutoTokenizer
-
-
-def load_data_mil(
-    data_path: str,
-    padding_idx: int
-) -> Tuple[InputsAndLabels, InputsAndLabels]:
-    # Load data with multiple instances
-    # load input ids and compute mask
-    data = torch.load(data_path)
-    input_ids, labels = data['input-ids'], data['labels']
-    input_mask = (input_ids != padding_idx)
-
-    # Mask needed for attention layer i.e. mask instances
-    instances_mask = (input_mask.sum(dim=-1) !=
-                      padding_idx*input_mask.shape[-1])
-    # build data
-    return InputsAndLabels(
-        inputs=NamedTensorDataset(
-            input_ids=input_ids, input_mask=input_mask, instances_mask=instances_mask),
-        labels=labels
-    )
-
-
-def load_data(
-    data_path: str,
-    padding_idx: int
-) -> Tuple[InputsAndLabels, InputsAndLabels]:
-    # Load data with only one instance
-    # load input ids and compute mask
-    data = torch.load(data_path)
-    input_ids, labels = data['input-ids'], data['labels']
-    input_mask = (input_ids != padding_idx)
-    # build data
-    return InputsAndLabels(
-        inputs=NamedTensorDataset(input_ids=input_ids, input_mask=input_mask),
-        labels=labels
-    )
 
 
 def compute_metrics(
@@ -97,6 +56,21 @@ def compute_metrics(
         "H3": hits(preds, targets, k=3),
         "H5": hits(preds, targets, k=5),
     }
+
+
+def load_data(
+    data_path: str,
+    padding_idx: int
+) -> Tuple[InputsAndLabels, InputsAndLabels]:
+    # load input ids and compute mask
+    data = torch.load(data_path)
+    input_ids, labels = data['input-ids'], data['labels']
+    input_mask = (input_ids != padding_idx)
+    # build data
+    return InputsAndLabels(
+        inputs=NamedTensorDataset(input_ids=input_ids, input_mask=input_mask),
+        labels=labels
+    )
 
 
 def train_end2end(
@@ -170,14 +144,9 @@ def train_levelwise(
 
 if __name__ == '__main__':
 
-    print("Start training")
-    t0 = time.time()
-
     from argparse import ArgumentParser
     # build argument parser
     parser = ArgumentParser("Train a model on the preprocessed data.")
-    parser.add_argument("--model-type", type=str,
-                        help="Choose the model type to train")
     parser.add_argument("--train-data", type=str,
                         help="Path to the preprocessed train data.")
     parser.add_argument("--val-data", type=str,
@@ -188,85 +157,44 @@ if __name__ == '__main__':
     parser.add_argument("--label-tree", type=str,
                         help="Path to the label tree file.")
     parser.add_argument("--output-dir", type=str, help="Output directory.")
-
     # parse arguments
     args = parser.parse_args()
 
-    # load model parameters
-    with open(f"{args.output_dir}/params.yaml", "r") as f:
+    # create the output directory
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # load model and trainer parameters
+    with open(f"./{args.output_dir}/params.yaml", "r") as f:
         params = yaml.load(f.read(), Loader=yaml.SafeLoader)
 
-    label_tree_file = args.label_tree
-    label_tree_dir = os.path.dirname(label_tree_file)
-
-    preprocessed_data_path = os.path.dirname(args.train_data)
-
-    # Read preprocessing arguments to get padding id of tokenizer
-    with open(f"{preprocessed_data_path}/params.yaml", "r") as f:
-        params['preprocess'] = yaml.load(f.read(), Loader=yaml.SafeLoader)[
-            'preprocess']
-
-    # Read tree params
-    with open(f"{label_tree_dir}/params.yaml", "r") as f:
-        params['label_tree'] = yaml.load(f.read(), Loader=yaml.SafeLoader)[
-            'label_tree']
-
-    # Write preprocessing and training parameters into same file
-    with open(f"{args.output_dir}/params.yaml", 'w') as outfile:
-        yaml.dump(params, outfile, default_flow_style=False)
+    # load pretrained embedding
+    with open(args.vocab, "r") as f:
+        vocab = json.loads(f.read())
+        padding_idx = vocab['[pad]']
+    emb_init = np.load(args.embed)
 
     # load label tree
-    with open(label_tree_file, "rb") as f:
+    with open(args.label_tree, "rb") as f:
         tree = pickle.load(f)
 
-    if args.model_type == 'mil':
-
-        assert(params['preprocess']['tokenizer'] ==
-               params['model']['encoder']['name'])
-
-        # Get parameters of pretrained sentence transformer
-        padding_idx = AutoTokenizer.from_pretrained(
-            f"sentence-transformers/{params['preprocess']['tokenizer']}").pad_token_id
-
-        # create the model
-        model = ProbabilisticLabelTree(
-            tree=tree,
-            cls_factory=SentenceTransformerFactory.from_params(
-                params=params['model'])
+    # create the model
+    model = ProbabilisticLabelTree(
+        tree=tree,
+        cls_factory=LSTMClassifierFactory.from_params(
+            params=params['model'],
+            padding_idx=padding_idx,
+            emb_init=emb_init
         )
+    )
 
-        # load train and validation data
-        train_data = load_data_mil(data_path=args.train_data,
-                                   padding_idx=padding_idx)
-        val_data = load_data_mil(
-            data_path=args.val_data, padding_idx=padding_idx)
-
-    elif args.model_type == 'attentionXML':
-        # load pretrained embedding
-        with open(args.vocab, "r") as f:
-            vocab = json.loads(f.read())
-            padding_idx = vocab['[pad]']
-            emb_init = np.load(args.embed)
-         # create the model
-        model = ProbabilisticLabelTree(
-            tree=tree,
-            cls_factory=LSTMClassifierFactory.from_params(
-                params=params['model'],
-                padding_idx=padding_idx,
-                emb_init=emb_init
-            )
-        )
-        # load train and validation data
-        train_data = load_data(data_path=args.train_data,
-                               padding_idx=padding_idx)
-        val_data = load_data(data_path=args.val_data, padding_idx=padding_idx)
-
-    else:
-        AssertionError("This is not a supported model type.")
+    # load train and validation data
+    train_data = load_data(data_path=args.train_data, padding_idx=padding_idx)
+    val_data = load_data(data_path=args.val_data, padding_idx=padding_idx)
 
     # check which training regime to use
     training_regime = {
         "levelwise": train_levelwise,
+        "end2end": train_end2end
     }[params['trainer']['regime']]
 
     # train model
@@ -320,6 +248,3 @@ if __name__ == '__main__':
         ax.grid()
     # save and show
     fig.savefig(os.path.join(args.output_dir, "validation-metrics.pdf"))
-
-    print(
-        f"Training completed. Elapsed time: {str(timedelta(seconds=time.time() - t0)).split('.', 2)[0]}")

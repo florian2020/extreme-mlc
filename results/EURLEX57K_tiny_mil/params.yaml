@@ -1,0 +1,34 @@
+label_tree:
+  group_id_chars: 0
+  label_file_path: ./data/datasets/EURLEX57K_tiny_mil
+model:
+  attention:
+    type: softmax-attention
+  classifier:
+    activation: relu
+    bias: true
+    hidden_layers:
+    - 256
+    type: mlp
+  dropout: 0.5
+  encoder:
+    name: all-MiniLM-L6-v2
+    output_dim: 384
+    type: sentence-transformer
+preprocess:
+  dataset_path: ./data/datasets/EURLEX57K_tiny_mil
+  max_instances: 8
+  max_tokens: 100
+  tokenizer: all-MiniLM-L6-v2
+trainer:
+  eval_batch_size: 3
+  eval_interval: 2
+  intermediate_save: null
+  load_model: null
+  lr_classifier: null
+  lr_encoder: null
+  num_candidates: null
+  num_steps: 100
+  regime: levelwise
+  topk: 100
+  train_batch_size: 3

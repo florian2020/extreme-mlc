@@ -1,7 +1,11 @@
 import os
 import pickle
+import yaml
+import time
+from datetime import timedelta
 from xmlc.tree_utils import index_tree
 from treelib import Tree
+
 
 def build_label_tree(labels, n=0):
     # create tree and add root node
@@ -27,34 +31,42 @@ def build_label_tree(labels, n=0):
             tree.create_node(label, label, parent=group_node)
 
     return tree
-        
+
 
 if __name__ == '__main__':
+
+    print("Start building label tree")
+    t0 = time.time()
 
     from argparse import ArgumentParser
     # build argument parser
     parser = ArgumentParser(description="Build the label tree.")
-    parser.add_argument("--labels-file", type=str, help="Path to file containing the labels.")
-    parser.add_argument("--group-id-chars", type=int, help="Group labels by their first n characters")
-    parser.add_argument("--output-file", type=str, help="File to save the label tree at.")
+    parser.add_argument("--output-file", type=str,
+                        help="File to save the label tree at.")
+
     # parser arguments
     args = parser.parse_args()
+    output_path = os.path.dirname(args.output_file)
+
+    # load preprocessing parameters
+    with open(f"{output_path}/params.yaml", "r") as f:
+        params = yaml.load(f.read(), Loader=yaml.SafeLoader)['label_tree']
 
     # group the labels by their first n characters
     # e.g. 3-0355.1 -> 3-0 for n=3
-    n = args.group_id_chars
+    n = params['group_id_chars']
 
     # load labels
-    with open(args.labels_file, "r") as f:
+    with open(os.path.join(params['label_file_path'], 'labels_vocab.txt'), "r") as f:
         labels = f.read().splitlines()
 
     # build the label tree and index it
     tree = build_label_tree(labels, n=n)
     tree = index_tree(tree)
 
-    # create output dir if necessary
-    output_dir = os.path.dirname(args.output_file)
-    os.makedirs(output_dir, exist_ok=True)
     # save the tree
     with open(args.output_file, "wb+") as f:
         pickle.dump(tree, f)
+
+    print(
+        f"Building label tree completed completed. Elapsed time: {str(timedelta(seconds=time.time() - t0)).split('.', 2)[0]}")

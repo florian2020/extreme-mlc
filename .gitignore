@@ -4,4 +4,6 @@ model/
 data/
 logs/
 pretrained/
-results/
+**.bin
+**.pkl
+.vscode/
