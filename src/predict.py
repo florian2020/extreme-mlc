@@ -77,7 +77,7 @@ if __name__ == '__main__':
         tree = pickle.load(f)
     num_labels = len(set(n.data.level_index for n in tree.leaves()))
 
-    if args.model_type == 'attentionXML':
+    if params['model']['encoder']['type'] == 'lstm':
         # load vocabulary
         with open(args.vocab, "r") as f:
             vocab = json.loads(f.read())
@@ -96,7 +96,7 @@ if __name__ == '__main__':
         # load the test data
         test_data = load_data(data_path=args.test_data,
                               padding_idx=padding_idx)
-    elif args.model_type == 'mil':
+    elif params['model']['encoder']['type'] == 'sentence-transformer':
         padding_idx = AutoTokenizer.from_pretrained(
             f"sentence-transformers/{params['preprocess']['tokenizer']}").pad_token_id
 

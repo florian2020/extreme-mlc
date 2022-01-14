@@ -219,7 +219,7 @@ if __name__ == '__main__':
     with open(label_tree_file, "rb") as f:
         tree = pickle.load(f)
 
-    if args.model_type == 'mil':
+    if params['model']['encoder']['type'] == 'sentence-transformer':
 
         assert(params['preprocess']['tokenizer'] ==
                params['model']['encoder']['name'])
@@ -241,7 +241,7 @@ if __name__ == '__main__':
         val_data = load_data_mil(
             data_path=args.val_data, padding_idx=padding_idx)
 
-    elif args.model_type == 'attentionXML':
+    elif params['model']['encoder']['type'] == 'lstm':
         # load pretrained embedding
         with open(args.vocab, "r") as f:
             vocab = json.loads(f.read())

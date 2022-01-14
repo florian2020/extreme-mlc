@@ -12,7 +12,6 @@ python src/build_label_tree.py \
 --output-file $preprocessed_dir/flat_label_tree.pkl
 
 python src/train.py \
---model-type mil \
 --train-data $preprocessed_dir/train_data.pkl \
 --val-data $preprocessed_dir/val_data.pkl \
 --label-tree $preprocessed_dir/flat_label_tree.pkl \
@@ -21,7 +20,6 @@ python src/train.py \
 python src/predict.py \
 --test-data $preprocessed_dir/test_data.pkl \
 --model-path $results_dir/model.bin \
---model-type mil \
 --label-tree $preprocessed_dir/flat_label_tree.pkl \
 --output-dir $results_dir
 

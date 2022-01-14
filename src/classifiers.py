@@ -319,12 +319,12 @@ class LSTMClassifierFactory(object):
     @ staticmethod
     def from_params(params, padding_idx: int, emb_init: np.ndarray):
         return LSTMClassifierFactory(
-            encoder_hidden_size=params['encoder']['hidden_size'],
+            encoder_hidden_size=params['encoder']['output_dim'],
             encoder_num_layers=params['encoder']['num_layers'],
             attention_type=params['attention']['type'],
-            mlp_hidden_layers=params['mlp']['hidden_layers'],
-            mlp_bias=params['mlp']['bias'],
-            mlp_activation=params['mlp']['activation'],
+            mlp_hidden_layers=params['classifier']['hidden_layers'],
+            mlp_bias=params['classifier']['bias'],
+            mlp_activation=params['classifier']['activation'],
             dropout=params['dropout'],
             padding_idx=padding_idx,
             emb_init=emb_init

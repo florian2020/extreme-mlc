@@ -1,0 +1,32 @@
+label_tree:
+  group_id_chars: 0
+  label_file_path: ./data/datasets/EURLEX57K_tiny
+model:
+  attention:
+    type: softmax-attention
+  classifier:
+    activation: relu
+    bias: true
+    hidden_layers:
+    - 256
+    type: mlp
+  dropout: 0.5
+  encoder:
+    num_layers: 1
+    output_dim: 256
+    type: lstm
+preprocess:
+  dataset_path: ./data/datasets/EURLEX57K_tiny
+  max_tokens: 500
+  pretrained-emb: ./data/word_embeddings/glove_attentionXML/glove_all_vectors.npy
+    \
+  pretrained-vocab: ./data/word_embeddings/glove_attentionXML/glove_vocab.npy \
+  tokenizer: spacy
+trainer:
+  eval_batch_size: 3
+  eval_interval: 2
+  num_candidates: null
+  num_steps: 100
+  regime: levelwise
+  topk: 100
+  train_batch_size: 3
