@@ -49,7 +49,7 @@ if __name__ == '__main__':
     output_path = os.path.dirname(args.output_file)
 
     # load preprocessing parameters
-    with open(f"{output_path}/params.yaml", "r") as f:
+    with open(f"{output_path}/params_tree.yaml", "r") as f:
         params = yaml.load(f.read(), Loader=yaml.SafeLoader)['label_tree']
 
     # group the labels by their first n characters

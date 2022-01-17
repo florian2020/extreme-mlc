@@ -22,6 +22,7 @@ class MLP(nn.Module):
             nn.Linear(n, m, bias=bias)
             for n, m in zip(layers[:-1], layers[1:])
         ])
+
         # initialize weights with xavier uniform
         for layer in self.layers:
             nn.init.xavier_uniform_(layer.weight)
@@ -121,7 +122,7 @@ class LabelAttentionClassifierMLP(nn.Module):
         return self.mlp(m).squeeze(-1)
 
 
-class IntraBagClassifier(nn.Module):
+class IntraBagAttentionClassifier(nn.Module):
     """ Label-attention based Multi-Label Classifier """
 
     def __init__(self,
@@ -130,7 +131,7 @@ class IntraBagClassifier(nn.Module):
                  attention: nn.Module,
                  ) -> None:
         # initialize module
-        super(IntraBagClassifier, self).__init__()
+        super(IntraBagAttentionClassifier, self).__init__()
         # save the attention and mlp module
         self.att = attention
         # create label embedding

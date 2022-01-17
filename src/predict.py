@@ -69,7 +69,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # load model parameters
-    with open(os.path.join(os.path.dirname(args.model_path), "params.yaml"), "r") as f:
+    with open(os.path.join(os.path.dirname(args.model_path), "params_experiment.yaml"), "r") as f:
         params = yaml.load(f.read(), Loader=yaml.SafeLoader)
 
     # load label tree
@@ -98,7 +98,7 @@ if __name__ == '__main__':
                               padding_idx=padding_idx)
     elif params['model']['encoder']['type'] == 'sentence-transformer':
         padding_idx = AutoTokenizer.from_pretrained(
-            f"sentence-transformers/{params['preprocess']['tokenizer']}").pad_token_id
+            f"sentence-transformers/{params['model']['encoder']['name']}").pad_token_id
 
         # create the model
         model = ProbabilisticLabelTree(

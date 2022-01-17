@@ -35,9 +35,18 @@ max_instances = 0
 texts = []
 # Load model from HuggingFace Hub
 tokenizer = AutoTokenizer.from_pretrained(
-    'sentence-transformers/multi-qa-MiniLM-L6-cos-v1')
-# model = AutoModel.from_pretrained(
-#     'sentence-transformers/all-MiniLM-L12-v2')
+    'sentence-transformers/all-MiniLM-L6-v2')
+model = AutoModel.from_pretrained(
+    'sentence-transformers/all-MiniLM-L6-v2')
+
+pytorch_total_params = sum(p.numel() for p in model.parameters())
+
+pytorch_trainable_params = sum(p.numel()
+                               for p in model.parameters() if p.requires_grad == True)
+
+
+print("Num parameters: ", pytorch_total_params)
+print("Num trainable params: ", pytorch_trainable_params)
 
 # model = SentenceTransformer('all-MiniLM-L12-v2')
 

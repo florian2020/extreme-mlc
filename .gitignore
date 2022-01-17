@@ -3,6 +3,7 @@ __pycache__/
 model/
 data/
 logs/
+results/
 pretrained/
 **.bin
 **.pkl

@@ -165,7 +165,7 @@ def load_eurlex57k_instances(path, split_name):
 
             sections = []
             sections.append(data_item['header'])
-            # sections.append(data_item['recitals'])
+            sections.append(data_item['recitals'])
             sections.extend([section
                             for section in data_item['main_body']])
             sections.append(data_item['attachments'])
@@ -196,4 +196,4 @@ if __name__ == '__main__':
     #                                 target_path="./data/datasets/EURLEX57K_tiny/")
 
     eurlex57k_to_extreme_milmlc_format(source_path="./data/datasets/EURLEX57K_original/",
-                                       target_path="./data/datasets/EURLEX57K_HMA_mil/")
+                                       target_path="./data/datasets/EURLEX57K_full_mil/")

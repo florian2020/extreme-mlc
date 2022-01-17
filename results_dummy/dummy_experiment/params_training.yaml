@@ -1,0 +1,24 @@
+model:
+  dropout: 0.5
+  encoder:
+    name: all-MiniLM-L6-v2
+    type: sentence-transformer
+    output_dim: 384
+  attention:
+    type: softmax-attention
+  classifier:
+    type: intra-bag
+  
+
+trainer:
+  eval_batch_size: 3
+  eval_interval: 2
+  intermediate_save: null
+  load_model: null
+  lr_classifier: 0.001
+  lr_encoder: 1.0e-05
+  num_candidates: null
+  num_steps: 100
+  regime: levelwise
+  topk: 100
+  train_batch_size: 3

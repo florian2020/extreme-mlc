@@ -62,7 +62,7 @@ if __name__ == '__main__':
     output_path = args.output_dir
 
     # load preprocessing parameters
-    with open(f"{args.output_dir}/params.yaml", "r") as f:
+    with open(f"{args.output_dir}/params_preprocess.yaml", "r") as f:
         params = yaml.load(f.read(), Loader=yaml.SafeLoader)['preprocess']
 
     dataset_path = params['dataset_path']

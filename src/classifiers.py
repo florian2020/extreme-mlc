@@ -1,6 +1,6 @@
 from xmlc.modules import (
     MLP,
-    IntraBagClassifier,
+    IntraBagAttentionClassifier,
     SoftmaxAttention,
     MultiHeadAttention,
     LabelAttentionClassifierMLP
@@ -118,7 +118,9 @@ class SentenceTransformerEncoder(nn.Module):
 
         input_mask = input_mask.reshape(batch_size * num_instances, seq_length)
 
-        return F.dropout(sentence_embeddings, p=self.dropout, training=self.training)
+        return sentence_embeddings
+
+        # return F.dropout(sentence_embeddings, p=self.dropout, training=self.training)
 
 
 class LSTMClassifier(nn.Module):
@@ -158,6 +160,21 @@ class LSTMClassifier(nn.Module):
             attention=attention,
             mlp=mlp
         )
+
+        print("Total model parameters: ", sum(p.numel()
+              for p in self.parameters()))
+        print("Trainable model parameters: ", sum(p.numel()
+                                                  for p in self.parameters() if p.requires_grad == True))
+
+        print("Total encoder parameters: ", sum(p.numel()
+              for p in self.enc.parameters()))
+        print("Trainable encoder parameters: ", sum(p.numel()
+                                                    for p in self.enc.parameters() if p.requires_grad == True))
+
+        print("Total classfifier parameters: ", sum(p.numel()
+              for p in self.cls.parameters()))
+        print("Trainable classifier parameters: ", sum(p.numel()
+                                                       for p in self.cls.parameters() if p.requires_grad == True))
 
     def forward(self, input_ids, input_mask, candidates=None):
         # apply encoder and pass output through classifer
@@ -217,13 +234,28 @@ class SentenceTransformerClassifier(nn.Module):
                 mlp=MLP(*self.mlp_layers, **self.mlp_kwargs)
             )
         elif model_params['classifier']['type'] == 'intra-bag':
-            self.cls = IntraBagClassifier(
+            self.cls = IntraBagAttentionClassifier(
                 hidden_size=self.encoder_hidden_size,
                 num_labels=num_labels,
                 attention=attention_module
             )
         else:
             AssertionError("Your chosen classifier type is not supported")
+
+        print("Total model parameters: ", sum(p.numel()
+              for p in self.parameters()))
+        print("Trainable model parameters: ", sum(p.numel()
+                                                  for p in self.parameters() if p.requires_grad == True))
+
+        print("Total encoder parameters: ", sum(p.numel()
+              for p in self.enc.parameters()))
+        print("Trainable encoder parameters: ", sum(p.numel()
+                                                    for p in self.enc.parameters() if p.requires_grad == True))
+
+        print("Total classfifier parameters: ", sum(p.numel()
+              for p in self.cls.parameters()))
+        print("Trainable classifier parameters: ", sum(p.numel()
+                                                       for p in self.cls.parameters() if p.requires_grad == True))
 
     def forward(self, input_ids, input_mask, instances_mask=None, candidates=None):
         # apply encoder and pass output through classifer

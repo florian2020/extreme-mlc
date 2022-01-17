@@ -62,6 +62,31 @@ def load_data(
     )
 
 
+def concatenate_experiment_params(args):
+
+    # Get Paths
+    label_tree_dir = os.path.dirname(args.label_tree)
+    preprocessed_data_path = os.path.dirname(args.train_data)
+
+    # Read preprocessing arguments to get padding id of tokenizer
+    with open(f"{preprocessed_data_path}/params_preprocess.yaml", "r") as f:
+        params_preprocess_string = f.read()
+
+    # Read tree params
+    with open(f"{label_tree_dir}/params_tree.yaml", "r") as f:
+        params_tree_string = f.read()
+
+    # Read training parameters
+    with open(f"{args.output_dir}/params_training.yaml", "r") as f:
+        params_string = f.read()
+
+    # Write preprocessing and training parameters into same file
+    with open(f"{args.output_dir}/params_experiment.yaml", 'w') as f:
+        f.writelines(params_preprocess_string + '\n\n')
+        f.writelines(params_tree_string + '\n\n')
+        f.writelines(params_string)
+
+
 def compute_metrics(
     preds: torch.LongTensor,
     targets: torch.LongTensor
@@ -141,7 +166,9 @@ def train_levelwise(
             topk=params['topk'],
             train_batch_size=params['train_batch_size'],
             val_batch_size=params['eval_batch_size'],
-            metrics=compute_metrics
+            metrics=compute_metrics,
+            lr_encoder=params['lr_encoder'],
+            lr_classifier=params['lr_classifier']
         )
         # create the trainer
         trainer = pl.Trainer(
@@ -192,30 +219,15 @@ if __name__ == '__main__':
     # parse arguments
     args = parser.parse_args()
 
-    # load model parameters
-    with open(f"{args.output_dir}/params.yaml", "r") as f:
+    # Write configuration files of preprocessing, tree building and training into the same file
+    concatenate_experiment_params(args)
+
+    # load parameters
+    with open(f"{args.output_dir}/params_experiment.yaml", "r") as f:
         params = yaml.load(f.read(), Loader=yaml.SafeLoader)
 
-    label_tree_file = args.label_tree
-    label_tree_dir = os.path.dirname(label_tree_file)
-
-    preprocessed_data_path = os.path.dirname(args.train_data)
-
-    # Read preprocessing arguments to get padding id of tokenizer
-    with open(f"{preprocessed_data_path}/params.yaml", "r") as f:
-        params['preprocess'] = yaml.load(f.read(), Loader=yaml.SafeLoader)[
-            'preprocess']
-
-    # Read tree params
-    with open(f"{label_tree_dir}/params.yaml", "r") as f:
-        params['label_tree'] = yaml.load(f.read(), Loader=yaml.SafeLoader)[
-            'label_tree']
-
-    # Write preprocessing and training parameters into same file
-    with open(f"{args.output_dir}/params.yaml", 'w') as outfile:
-        yaml.dump(params, outfile, default_flow_style=False)
-
     # load label tree
+    label_tree_file = args.label_tree
     with open(label_tree_file, "rb") as f:
         tree = pickle.load(f)
 
@@ -263,6 +275,12 @@ if __name__ == '__main__':
 
     else:
         AssertionError("This is not a supported model type.")
+
+    if "continue_training" in params['trainer']:
+        model_path = params['trainer']['continue_training']
+        print("Try to load model from: ", model_path)
+        state_dict = torch.load(model_path, map_location="cpu")
+        model.load_state_dict(state_dict)
 
     # check which training regime to use
     training_regime = {

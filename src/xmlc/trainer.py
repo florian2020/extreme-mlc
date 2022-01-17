@@ -178,7 +178,9 @@ class LevelTrainerModule(pl.LightningModule):
                  topk: int,
                  train_batch_size: int,
                  val_batch_size: int,
-                 metrics: Callable
+                 metrics: Callable,
+                 lr_encoder: float,
+                 lr_classifier: float
                  ) -> None:
         # initialize lightning module
         super().__init__()
@@ -197,18 +199,19 @@ class LevelTrainerModule(pl.LightningModule):
         # save data
         self.train_data = train_data
         self.val_data = val_data
+        # save optimizer parameters
+        self.lr_encoder = lr_encoder
+        self.lr_classifier = lr_classifier
 
     def configure_optimizers(self):
-        lr_encoder = 1e-7
-        lr_classification = 1e-3
         optimizer_config = []
 
         # Setting same configurations for all levels
         for classifier in self.model.classifiers:
             optimizer_config.append(
-                {'params': classifier.enc.parameters(), 'lr': lr_encoder})
+                {'params': classifier.enc.parameters(), 'lr': self.lr_encoder})
             optimizer_config.append(
-                {'params': classifier.cls.parameters(), 'lr': lr_classification})
+                {'params': classifier.cls.parameters(), 'lr': self.lr_classifier})
         return torch.optim.Adam(optimizer_config)
 
     def train_dataloader(self) -> DataLoader:
