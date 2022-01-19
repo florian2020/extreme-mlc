@@ -45,6 +45,36 @@ def build_spacy_tokenizer(vocab):
     )
 
 
+def build_spacy_english_tokenizer(vocab):
+    # get german tokenizer
+    from spacy.lang.en import English
+    # build tokenizer parameters
+    prefixes = English.Defaults.prefixes
+    suffixes = English.Defaults.suffixes
+    infixes = English.Defaults.infixes
+    prefix_search = spacy.util.compile_prefix_regex(
+        prefixes).search if prefixes else None
+    suffix_search = spacy.util.compile_suffix_regex(
+        suffixes).search if suffixes else None
+    infix_finditer = spacy.util.compile_infix_regex(
+        infixes).finditer if infixes else None
+    # add tokenizer exception for special tokens
+    exc = English.Defaults.tokenizer_exceptions
+    exc = spacy.util.update_exc(exc, {
+        '[SEP]': [{spacy.symbols.ORTH: "[SEP]"}]
+    })
+    # create tokenizer
+    return spacy.tokenizer.Tokenizer(
+        vocab=spacy.vocab.Vocab(strings=vocab.keys()),
+        rules=exc,
+        prefix_search=prefix_search,
+        suffix_search=suffix_search,
+        infix_finditer=infix_finditer,
+        token_match=English.Defaults.token_match,
+        url_match=English.Defaults.url_match
+    )
+
+
 def tokenize(tokenizer, texts):
     """ tokenize all given texts """
     return [
@@ -128,7 +158,7 @@ if __name__ == '__main__':
     parser.add_argument("--test-labels", type=str,
                         help="Path to the test labels file.")
     parser.add_argument("--tokenizer", type=str,
-                        choices=["Spacy", "NLTK"], help="Specify the tokenizer to use.")
+                        choices=["Spacy", "NLTK", "Spacy_eng"], help="Specify the tokenizer to use.")
     parser.add_argument("--max-tokens", type=int,
                         help="The maximum allowed number of tokens per input text.")
     parser.add_argument("--pretrained-vocab", type=str,
@@ -152,6 +182,7 @@ if __name__ == '__main__':
     # get the tokenizer
     tokenizer = {
         "Spacy": build_spacy_tokenizer,
+        'Spacy_eng': build_spacy_english_tokenizer,
         "NLTK": build_nltk_tokenizer
     }[args.tokenizer](vocab)
 

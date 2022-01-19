@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from treelib import Tree
 from torch import Tensor
 from typing import Tuple, Callable
-from .tree_utils import yield_tree_levels
 
 
 class MLP(nn.Module):
@@ -101,7 +99,6 @@ class LabelAttentionClassifierMLP(nn.Module):
     def forward(self,
                 x: torch.FloatTensor,
                 mask: torch.BoolTensor,
-                instances_mask: torch.BoolTensor = None,
                 candidates: torch.LongTensor = None
                 ) -> torch.FloatTensor:
         # use all embeddings if no candidates are provided
@@ -111,13 +108,9 @@ class LabelAttentionClassifierMLP(nn.Module):
             candidates = candidates.repeat(x.size(0), 1)
             candidates = candidates.to(x.device)
 
-        # If the data is not for MIL, the attention Layer can use the input_id mask
-        if instances_mask == None:
-            instances_mask = mask
-
         # get label embeddings and apply attention layer
         label_emb = self.label_embed(candidates)
-        m = self.att(x, instances_mask, label_emb)
+        m = self.att(x, mask, label_emb)
         # apply classifier
         return self.mlp(m).squeeze(-1)
 
@@ -153,7 +146,6 @@ class IntraBagAttentionClassifier(nn.Module):
     def forward(self,
                 x: torch.FloatTensor,
                 mask: torch.BoolTensor,
-                instances_mask: torch.BoolTensor = None,
                 candidates: torch.LongTensor = None
                 ) -> torch.FloatTensor:
         # use all embeddings if no candidates are provided
@@ -163,13 +155,9 @@ class IntraBagAttentionClassifier(nn.Module):
             candidates = candidates.repeat(x.size(0), 1)
             candidates = candidates.to(x.device)
 
-        # If the data is not for MIL, the attention Layer can use the input_id mask
-        if instances_mask == None:
-            instances_mask = mask
-
         # get label embeddings and apply attention layer
         label_emb = self.label_embed(candidates)
-        m = self.att(x, instances_mask, label_emb)
+        m = self.att(x, mask, label_emb)
 
         dot_prod = torch.sum(m*label_emb, dim=-1)
         bias = self.bias(candidates).squeeze(-1)

@@ -12,7 +12,7 @@ from xmlc.plt import ProbabilisticLabelTree, PLTOutput
 from xmlc.utils import build_sparse_tensor
 from xmlc.tree_utils import convert_labels_to_ids
 from train import load_data, load_data_mil
-from classifiers import LSTMClassifierFactory, SentenceTransformerFactory
+from classifiers import ClassifierFactory
 from transformers import AutoTokenizer
 
 
@@ -77,40 +77,40 @@ if __name__ == '__main__':
         tree = pickle.load(f)
     num_labels = len(set(n.data.level_index for n in tree.leaves()))
 
-    if params['model']['encoder']['type'] == 'lstm':
+    # Load vocab depending on the encoder
+    if params['model']['encoder']['type'] == 'sentence-transformer':
+
+        assert(params['preprocess']['tokenizer'] ==
+               params['model']['encoder']['name'])
+
+        # Get parameters of pretrained sentence transformer
+        padding_idx = AutoTokenizer.from_pretrained(
+            f"sentence-transformers/{params['preprocess']['tokenizer']}").pad_token_id
+
+        emb_init = None
+
+        test_data = load_data_mil(data_path=args.test_data,
+                                  padding_idx=padding_idx)
+
+    elif params['model']['encoder']['type'] == 'lstm':
         # load vocabulary
         with open(args.vocab, "r") as f:
             vocab = json.loads(f.read())
             padding_idx = vocab['[pad]']
-        emb_init = np.load(args.embed)
+            emb_init = np.load(args.embed)
 
-        # create the model
-        model = ProbabilisticLabelTree(
-            tree=tree,
-            cls_factory=LSTMClassifierFactory.from_params(
-                params=params['model'],
-                padding_idx=padding_idx,
-                emb_init=emb_init
-            )
-        )
-        # load the test data
         test_data = load_data(data_path=args.test_data,
                               padding_idx=padding_idx)
-    elif params['model']['encoder']['type'] == 'sentence-transformer':
-        padding_idx = AutoTokenizer.from_pretrained(
-            f"sentence-transformers/{params['model']['encoder']['name']}").pad_token_id
 
-        # create the model
-        model = ProbabilisticLabelTree(
-            tree=tree,
-            cls_factory=SentenceTransformerFactory.from_params(
-                params=params['model'])
+    # create the model
+    model = ProbabilisticLabelTree(
+        tree=tree,
+        cls_factory=ClassifierFactory.from_params(
+            model_params=params['model'],
+            padding_idx=padding_idx,
+            emb_init=emb_init
         )
-        # load the test data
-        test_data = load_data_mil(data_path=args.test_data,
-                                  padding_idx=padding_idx)
-    else:
-        AssertionError("This is not a supported model type.")
+    )
 
     # load model parameters
     state_dict = torch.load(args.model_path, map_location="cpu")

@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 from treelib import Tree
 from typing import Dict, Tuple, List, Any, Callable
 # import attention-xml
-from train_deprecated import train_levelwise, compute_metrics
 from xmlc.trainer import (
     LevelTrainerModule,
     InputsAndLabels
@@ -20,7 +19,7 @@ from xmlc.metrics import *
 from xmlc.plt import ProbabilisticLabelTree
 from xmlc.dataset import NamedTensorDataset
 from xmlc.utils import build_sparse_tensor
-from classifiers import LSTMClassifierFactory, SentenceTransformerFactory
+from classifiers import ClassifierFactory
 from logger import LogHistory
 from transformers import AutoTokenizer
 
@@ -77,7 +76,7 @@ def concatenate_experiment_params(args):
         params_tree_string = f.read()
 
     # Read training parameters
-    with open(f"{args.output_dir}/params_training.yaml", "r") as f:
+    with open(f"{args.output_dir}/params_train.yaml", "r") as f:
         params_string = f.read()
 
     # Write preprocessing and training parameters into same file
@@ -231,6 +230,7 @@ if __name__ == '__main__':
     with open(label_tree_file, "rb") as f:
         tree = pickle.load(f)
 
+    # Load data depending on the encoder
     if params['model']['encoder']['type'] == 'sentence-transformer':
 
         assert(params['preprocess']['tokenizer'] ==
@@ -240,12 +240,7 @@ if __name__ == '__main__':
         padding_idx = AutoTokenizer.from_pretrained(
             f"sentence-transformers/{params['preprocess']['tokenizer']}").pad_token_id
 
-        # create the model
-        model = ProbabilisticLabelTree(
-            tree=tree,
-            cls_factory=SentenceTransformerFactory.from_params(
-                params=params['model'])
-        )
+        emb_init = None
 
         # load train and validation data
         train_data = load_data_mil(data_path=args.train_data,
@@ -254,27 +249,26 @@ if __name__ == '__main__':
             data_path=args.val_data, padding_idx=padding_idx)
 
     elif params['model']['encoder']['type'] == 'lstm':
-        # load pretrained embedding
         with open(args.vocab, "r") as f:
             vocab = json.loads(f.read())
             padding_idx = vocab['[pad]']
             emb_init = np.load(args.embed)
-         # create the model
-        model = ProbabilisticLabelTree(
-            tree=tree,
-            cls_factory=LSTMClassifierFactory.from_params(
-                params=params['model'],
-                padding_idx=padding_idx,
-                emb_init=emb_init
-            )
-        )
+
         # load train and validation data
         train_data = load_data(data_path=args.train_data,
                                padding_idx=padding_idx)
         val_data = load_data(data_path=args.val_data, padding_idx=padding_idx)
-
     else:
-        AssertionError("This is not a supported model type.")
+        AssertionError("This is not a supported encoder type.")
+
+    # create the model
+    model = ProbabilisticLabelTree(
+        tree=tree,
+        cls_factory=ClassifierFactory.from_params(
+            model_params=params['model'],
+            padding_idx=padding_idx,
+            emb_init=emb_init)
+    )
 
     if "continue_training" in params['trainer']:
         model_path = params['trainer']['continue_training']

@@ -17,7 +17,7 @@ from xmlc.metrics import *
 from xmlc.plt import ProbabilisticLabelTree
 from xmlc.dataset import NamedTensorDataset
 from xmlc.utils import build_sparse_tensor
-from classifiers import LSTMClassifierFactory
+from classifiers import DocClassifierFactory
 from logger import LogHistory
 
 
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     # create the model
     model = ProbabilisticLabelTree(
         tree=tree,
-        cls_factory=LSTMClassifierFactory.from_params(
+        cls_factory=DocClassifierFactory.from_params(
             params=params['model'],
             padding_idx=padding_idx,
             emb_init=emb_init
