@@ -158,7 +158,7 @@ if __name__ == '__main__':
     parser.add_argument("--test-labels", type=str,
                         help="Path to the test labels file.")
     parser.add_argument("--tokenizer", type=str,
-                        choices=["Spacy", "NLTK", "Spacy_eng"], help="Specify the tokenizer to use.")
+                        choices=["Spacy_de", "NLTK", "Spacy_en"], help="Specify the tokenizer to use.")
     parser.add_argument("--max-tokens", type=int,
                         help="The maximum allowed number of tokens per input text.")
     parser.add_argument("--pretrained-vocab", type=str,
@@ -181,8 +181,8 @@ if __name__ == '__main__':
 
     # get the tokenizer
     tokenizer = {
-        "Spacy": build_spacy_tokenizer,
-        'Spacy_eng': build_spacy_english_tokenizer,
+        "Spacy_de": build_spacy_tokenizer,
+        'Spacy_en': build_spacy_english_tokenizer,
         "NLTK": build_nltk_tokenizer
     }[args.tokenizer](vocab)
 

@@ -13,8 +13,10 @@
 
 |Model|ndcg@1|ndcg@3|ndcg@5|
 |---|---|---|---|
-|AttentionXML original implementation (larger training set, smaller validation set)|93.2|86.9|83.2| 
+|AttentionXML original implementation (val set 2000)|93.2|86.9|83.2|
+|AttentionXML original implementation (val set 6000)|92.7|86.4|83.0|
 |AttentionXML own implementation (emb trainable) |92.0|85.7|82.1|
 |AttentionXML own implementation (emb not trainable) |91.9|85.4|81.8|
+|LSTM Encoder full text with intra bag|88.4|81.1|77.1|
 |all-MiniLm-L6-v2 (lr 1e-5) and intra-bag (lr 1e-3)      |91.7   |85.3   |81.1|
 |all-MiniLm-L6-v2 (lr 1e-5) and mlp (lr 1e-3)            |90.3    |83.8   | 80.1|

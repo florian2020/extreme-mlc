@@ -9,6 +9,11 @@ from datetime import timedelta
 
 
 def load_raw_texts(path: str) -> list():
+    """
+    Load data where each document is stored as a list of
+    sections in a json lines format. Also count on the fly
+    the max number of instances for any document.
+    """
 
     texts = []
     max_instances = 0
@@ -24,21 +29,19 @@ def load_raw_texts(path: str) -> list():
 
 
 def tokenize(tokenizer: PreTrainedTokenizerFast, texts: list(), max_tokens) -> list():
+    """
+    Apply sentence transformer tokenizer which returns a list of token ids (padded to max_tokens length)
+    for each passed text
+    """
 
-    tokenized_instances_ids = []
-    for instances in tqdm(texts, 'Tokenizing'):
-        # Tokenize instances
-        tokenized_instances_ids.append(tokenizer(
-            instances, padding='max_length', max_length=max_tokens, truncation=True, return_attention_mask=False)['input_ids'])
-
-    return tokenized_instances_ids
+    return [tokenizer(instances, padding='max_length', max_length=max_tokens, truncation=True, return_attention_mask=False)[
+        'input_ids']for instances in tqdm(texts, 'Tokenizing')]
 
 
 def truncate_pad_instances(tokenized_instances_ids, max_instances, max_tokens, padding_token):
-
-    a = tokenized_instances_ids[0]
-    b = a[:max_instances] + [[padding_token]*max_tokens] * \
-        max(0, max_instances - len(a))
+    """
+    Pad instances such that all documents have the same number of instances
+    """
 
     return [
         instances[:max_instances] +
@@ -76,14 +79,13 @@ if __name__ == '__main__':
     # Load raw texts
     train_texts, max_train_instances = load_raw_texts(
         os.path.join(dataset_path, 'train_texts.json'))
-    val_texts, max_val_instances = load_raw_texts(
+    val_texts, _ = load_raw_texts(
         os.path.join(dataset_path, 'val_texts.json'))
-    test_texts, max_test_instances = load_raw_texts(
+    test_texts, _ = load_raw_texts(
         os.path.join(dataset_path, 'test_texts.json'))
 
     if max_instances == -1:
-        max_instances = max(
-            max_train_instances, max_test_instances, max_val_instances)
+        max_instances = max_train_instances
 
     print(f"The maximum number of instances is {max_instances}")
 

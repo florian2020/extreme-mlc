@@ -28,6 +28,10 @@ def load_data_mil(
     data_path: str,
     padding_idx: int
 ) -> Tuple[InputsAndLabels, InputsAndLabels]:
+    """
+    Load pickled data of the shape: (num_examples, num_instances, num_tokens).
+    """
+
     # Load data with multiple instances
     # load input ids and compute mask
     data = torch.load(data_path)
@@ -49,6 +53,9 @@ def load_data(
     data_path: str,
     padding_idx: int
 ) -> Tuple[InputsAndLabels, InputsAndLabels]:
+    """
+    Load pickled data of the shape: (num_examples, num_tokens)
+    """
     # Load data with only one instance
     # load input ids and compute mask
     data = torch.load(data_path)
@@ -62,6 +69,11 @@ def load_data(
 
 
 def concatenate_experiment_params(args):
+    """
+    Read all params files which have an impact on the trained model and
+    write them into a single config file for clear documentation of the
+    outcome of an experiment
+    """
 
     # Get Paths
     label_tree_dir = os.path.dirname(args.label_tree)
@@ -241,6 +253,18 @@ if __name__ == '__main__':
             f"sentence-transformers/{params['preprocess']['tokenizer']}").pad_token_id
 
         emb_init = None
+
+        # load train and validation data
+        train_data = load_data_mil(data_path=args.train_data,
+                                   padding_idx=padding_idx)
+        val_data = load_data_mil(
+            data_path=args.val_data, padding_idx=padding_idx)
+
+    elif params['model']['encoder']['type'] == 'lstm-mil':
+        with open(args.vocab, "r") as f:
+            vocab = json.loads(f.read())
+            padding_idx = vocab['[pad]']
+            emb_init = np.load(args.embed)
 
         # load train and validation data
         train_data = load_data_mil(data_path=args.train_data,

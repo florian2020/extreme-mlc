@@ -45,6 +45,10 @@ class LSTMEncoder(nn.Module):
                 input_ids: torch.LongTensor,
                 input_mask: torch.BoolTensor
                 ) -> torch.Tensor:
+        """
+        Input shape: (batch_size,num_tokens)
+        Output shape: (batch_size,num_tokens,hidden_size)
+        """
         # flatten parameters
         self.lstm.flatten_parameters()
         # pass through embedding
@@ -74,7 +78,7 @@ class LSTMEncoder(nn.Module):
 
 
 class LSTMSentenceEncoder(nn.Module):
-    """ Basic LSTM Encoder """
+    """LSTM Encoder followed by a pooling operation to obtain sentence embeddings. """
 
     def __init__(self,
                  hidden_size: int,
@@ -93,7 +97,7 @@ class LSTMSentenceEncoder(nn.Module):
             hidden_size=self.hidden_size,
             num_layers=num_layers,
             padding_idx=padding_idx,
-            emb_init=torch.from_numpy(emb_init).float(),
+            emb_init=emb_init,
             dropout=dropout
         )
 
@@ -102,23 +106,25 @@ class LSTMSentenceEncoder(nn.Module):
                 input_mask: torch.BoolTensor
                 ) -> torch.Tensor:
         """
-        To be tested
+        Input shape: (batch_size,num_instances,num_tokens)
+        Output shape: (batch_size,num_instances,hidden_size)
         """
 
-        batch_size, num_instances, seq_length = input_ids.shape
+        batch_size, num_instances, num_tokens = input_ids.shape
 
         # Flatten instance dimension of input and mask
         input_ids_without_instances = input_ids.view(
-            batch_size, seq_length * num_instances)
+            batch_size, num_tokens * num_instances)
         input_mask_without_instances = input_mask.view(
-            batch_size, seq_length * num_instances)
+            batch_size, num_tokens * num_instances)
 
         x = self.lstm(input_ids_without_instances,
                       input_mask_without_instances)
 
         # Recover instance dimension
-        x = x.view(batch_size, num_instances, seq_length, self.hidden_size*2)
+        x = x.view(batch_size, num_instances, num_tokens, self.hidden_size*2)
 
+        # Return mean over words of an instance
         return x.mean(-2)
 
 
@@ -136,14 +142,18 @@ class SentenceTransformerEncoder(nn.Module):
                 input_ids: torch.LongTensor,
                 input_mask: torch.BoolTensor
                 ) -> torch.Tensor:
+        """
+        Input shape: (batch_size,num_instances,num_tokens)
+        Output shape: (batch_size,num_instances,hidden_size)
+        """
 
-        batch_size, num_instances, seq_length = input_ids.shape
+        batch_size, num_instances, num_tokens = input_ids.shape
 
         # Flatten instance dimension of input and mask
         input_ids_without_instances = input_ids.view(
-            batch_size * num_instances, seq_length)
+            batch_size * num_instances, num_tokens)
         input_mask_without_instances = input_mask.view(
-            batch_size * num_instances, seq_length)
+            batch_size * num_instances, num_tokens)
 
         model_output = self.sentence_transformer_model(
             {'input_ids': input_ids_without_instances, 'attention_mask': input_mask_without_instances})
