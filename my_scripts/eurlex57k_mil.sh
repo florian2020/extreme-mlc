@@ -2,7 +2,7 @@
 
 
 preprocessed_dir=./data/preprocessed/EURLEX57K_mil_spacy_eng
-results_dir=./results/EURLEX57K_full_lstm_mean_mil
+results_dir=./results/EURLEX57K_full_lstm_last_mil_intra_cont
 
 
 # python src/preprocess_lstm_mil.py \
@@ -19,13 +19,15 @@ python src/train.py \
 --label-tree $preprocessed_dir/flat_label_tree.pkl \
 --output-dir $results_dir
 
-# python src/predict.py \
-# --test-data $preprocessed_dir/test_data.pkl \
-# --model-path $results_dir/model.bin \
-# --label-tree $preprocessed_dir/flat_label_tree.pkl \
-# --output-dir $results_dir
+python src/predict.py \
+--test-data $preprocessed_dir/test_data.pkl \
+--model-path $results_dir/model.bin \
+--vocab $preprocessed_dir/vocab.json \
+--embed $preprocessed_dir/vectors.npy \
+--label-tree $preprocessed_dir/flat_label_tree.pkl \
+--output-dir $results_dir
 
-# python src/evaluate.py \
-# --model-output $results_dir/predictions.pkl \
-# --sparse-targets $results_dir/targets.pkl \
-# --output-dir $results_dir
+python src/evaluate.py \
+--model-output $results_dir/predictions.pkl \
+--sparse-targets $results_dir/targets.pkl \
+--output-dir $results_dir

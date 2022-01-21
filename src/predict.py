@@ -92,6 +92,16 @@ if __name__ == '__main__':
         test_data = load_data_mil(data_path=args.test_data,
                                   padding_idx=padding_idx)
 
+    elif params['model']['encoder']['type'] == 'lstm-mil':
+        # load vocabulary
+        with open(args.vocab, "r") as f:
+            vocab = json.loads(f.read())
+            padding_idx = vocab['[pad]']
+            emb_init = np.load(args.embed)
+
+        test_data = load_data_mil(data_path=args.test_data,
+                                padding_idx=padding_idx)
+
     elif params['model']['encoder']['type'] == 'lstm':
         # load vocabulary
         with open(args.vocab, "r") as f:

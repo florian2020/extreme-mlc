@@ -124,8 +124,16 @@ class LSTMSentenceEncoder(nn.Module):
         # Recover instance dimension
         x = x.view(batch_size, num_instances, num_tokens, self.hidden_size*2)
 
-        # Return mean over words of an instance
-        return x.mean(-2)
+        # # Count how many word per instance
+        # mask = input_mask.sum(-1)
+        # # Alter instances with 0 word to not divide by zero
+        # mask[mask == 0] = 1
+        # # Sum word vectors per instance
+        # x = x.sum(-2)
+        # # Mean over words per instance
+        # return x/mask[:, :, None]
+
+        return x[:, :, -1, :]
 
 
 class SentenceTransformerEncoder(nn.Module):
