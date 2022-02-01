@@ -150,6 +150,7 @@ def train_levelwise(
     train_data: InputsAndLabels,
     val_data: InputsAndLabels,
     params: Dict[str, Any],
+    bag_group_size,
     output_dir: str
 ) -> LogHistory:
     # use gpu if possible
@@ -179,7 +180,8 @@ def train_levelwise(
             val_batch_size=params['eval_batch_size'],
             metrics=compute_metrics,
             lr_encoder=params['lr_encoder'],
-            lr_classifier=params['lr_classifier']
+            lr_classifier=params['lr_classifier'],
+            bag_group_size=bag_group_size
         )
         # create the trainer
         trainer = pl.Trainer(
@@ -305,6 +307,11 @@ if __name__ == '__main__':
         "levelwise": train_levelwise,
     }[params['trainer']['regime']]
 
+    if 'bag_group_size' in params['model']['classifier']:
+        bag_group_size = params['model']['classifier']['bag_group_size']
+    else:
+        bag_group_size = None
+
     # train model
     history = training_regime(
         tree=tree,
@@ -312,6 +319,7 @@ if __name__ == '__main__':
         train_data=train_data,
         val_data=val_data,
         params=params['trainer'],
+        bag_group_size=bag_group_size,
         output_dir=args.output_dir
     )
 

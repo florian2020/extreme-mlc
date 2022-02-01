@@ -1,6 +1,6 @@
 from xmlc.modules import (
     MLP,
-    IntraBagAttentionClassifier,
+    BagAttentionClassifier,
     SoftmaxAttention,
     MultiHeadAttention,
     LabelAttentionClassifierMLP
@@ -98,11 +98,18 @@ class Classifier(nn.Module):
                 attention=attention_module,
                 mlp=MLP(*self.mlp_layers, **self.mlp_kwargs)
             )
-        elif model_params['classifier']['type'] == 'intra-bag':
-            self.cls = IntraBagAttentionClassifier(
-                hidden_size=classifier_input_dim,
+        elif model_params['classifier']['type'] == 'bag':
+
+            if 'bag_group_size' in model_params['classifier']:
+                bag_group_size = model_params['classifier']['bag_group_size']
+            else:
+                bag_group_size = None
+
+            self.cls = BagAttentionClassifier(
+                encoder_hidden_size=classifier_input_dim,
                 num_labels=num_labels,
-                attention=attention_module
+                attention=attention_module,
+                bag_group_size=bag_group_size
             )
         else:
             AssertionError("Your chosen classifier type is not supported")

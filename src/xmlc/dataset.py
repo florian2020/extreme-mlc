@@ -1,3 +1,4 @@
+from collections import defaultdict
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset, TensorDataset
@@ -21,24 +22,6 @@ class NamedTensorDataset(TensorDataset):
     def __getitem__(self, index) -> Dict[str, Tensor]:
         # get tensors and add names
         tensors = tuple(tensor[index] for tensor in self.tensors)
-        return dict(zip(self.names, tensors))
-
-
-class MilDataset(Dataset):
-    def __init__(self, **named_lists) -> None:
-        # named list is a dictionary of lists, where each element of the list
-        # is a tensor and represents
-        # get tupel of list names
-        self.names = tuple(named_lists.keys())
-        self.lists = (named_lists[n] for n in self.names)
-
-    def __len__(self):
-        'Denotes the total number of samples'
-        return len(self.list_IDs)
-
-    def __getitem__(self, index) -> Dict[str, list]:
-        # get tensors and add names
-        tensors = tuple(l[index] for l in self.lists)
         return dict(zip(self.names, tensors))
 
 
@@ -67,6 +50,17 @@ class MultiLabelDataset(Dataset):
             n, m)
         assert all(
             l in label_pool for ls in labels for l in ls), "Not all labels are present in the label pool!"
+
+    # Needed for dataloader for inter-bag attention model
+
+    def get_class_indices(self):
+
+        classes = defaultdict(list)
+        for i, labels in enumerate(self.labels):
+            for label in labels:
+                classes[label].append(i)
+
+        return [class_indices for class_indices in classes.values()]
 
     def sample_candidates(self, index: int, positives: Set[int]) -> Set[int]:
         # choose candidates completely random but make sure positives are contained

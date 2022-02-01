@@ -51,6 +51,31 @@ class SoftmaxAttention(nn.Module):
         return scores.transpose(1, 2) @ x
 
 
+class InterBagAttention(nn.Module):
+
+    def forward(self,
+                x: torch.FloatTensor
+                ) -> torch.FloatTensor:
+        '''
+        x: shape (num_bag_groups, bag_group_size, num_labels,encoder_hidden_size)
+        '''
+
+        # shape (num_bag_groups, num_labels, bag_group_size, encoder_hidden_size)
+        x = x.transpose(1, 2)
+
+        # shape (num_bag_groups, num_labels, bag_group_size, bag_group_size)
+        bag_similarities = x @ x.transpose(2, 3)
+
+        # Subtract one for similarity to oneself
+        bag_similarities = bag_similarities.sum(dim=-1) - 1
+
+        # shape (num_bag_groups, num_labels, bag_group_size)
+        bag_similarities = torch.softmax(bag_similarities, dim=-1)
+
+        # shape (num_bag_groups, num_labels, encoder_hidden_size)
+        return (bag_similarities[:, :, None, :] @ x).squeeze()
+
+
 class MultiHeadAttention(nn.MultiheadAttention):
     """ Multi-Head Attention Module that can be used in a `LabelAttentionClassifier` Module """
 
@@ -115,22 +140,28 @@ class LabelAttentionClassifierMLP(nn.Module):
         return self.mlp(m).squeeze(-1)
 
 
-class IntraBagAttentionClassifier(nn.Module):
+class BagAttentionClassifier(nn.Module):
     """ Label-attention based Multi-Label Classifier """
 
     def __init__(self,
-                 hidden_size: int,
+                 encoder_hidden_size: int,
                  num_labels: int,
                  attention: nn.Module,
+                 bag_group_size: int,
                  ) -> None:
         # initialize module
-        super(IntraBagAttentionClassifier, self).__init__()
+        super(BagAttentionClassifier, self).__init__()
+
+        # Store params
+        self.num_labels = num_labels
+        self.encoder_hidden_size = encoder_hidden_size
+
         # save the attention and mlp module
         self.att = attention
         # create label embedding
         self.label_embed = nn.Embedding(
             num_embeddings=num_labels,
-            embedding_dim=hidden_size,
+            embedding_dim=encoder_hidden_size,
             sparse=False
         )
 
@@ -139,6 +170,12 @@ class IntraBagAttentionClassifier(nn.Module):
             embedding_dim=1,
             sparse=False
         )
+
+        # None if inter_bag should not be used
+        self.bag_group_size = bag_group_size
+        # Interbag attention params
+        self.inter_bag_att = InterBagAttention()
+
         # use xavier uniform for initialization
         nn.init.xavier_uniform_(self.label_embed.weight)
         nn.init.xavier_uniform_(self.bias.weight)
@@ -157,10 +194,32 @@ class IntraBagAttentionClassifier(nn.Module):
 
         # get label embeddings and apply attention layer
         label_emb = self.label_embed(candidates)
-        m = self.att(x, mask, label_emb)
 
-        dot_prod = torch.sum(m*label_emb, dim=-1)
-        bias = self.bias(candidates).squeeze(-1)
+        for i in range(label_emb.shape[0]):
+            assert(torch.all(label_emb[0] == label_emb[i]))
+
+        # (num_bags,num_labels,hidden_dim)
+        x = self.att(x, mask, label_emb)
+
+        # Normalize each sample
+        x = x / torch.norm(x, dim=2, keepdim=True)
+
+        # Inter-Bag during training
+        if self.training and self.bag_group_size is not None:
+            # Form bag groups
+            x = x.view(-1, self.bag_group_size, self.num_labels,
+                       self.encoder_hidden_size)
+
+            # shape (num_bag_groups, num_labels, hidden_dim)
+            x = self.inter_bag_att(x)
+
+            label_emb = label_emb[:x.shape[0]]
+            bias = self.bias(candidates).squeeze(-1)[:x.shape[0]]
+        else:
+            bias = self.bias(candidates).squeeze(-1)
+
+        # (num_bags,num_labels)
+        dot_prod = torch.sum(x*label_emb, dim=-1)
 
         # apply classifier
         return dot_prod+bias

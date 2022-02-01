@@ -1,4 +1,5 @@
 import os
+import random
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
@@ -7,6 +8,8 @@ from torch.utils.data import Dataset, DataLoader
 from lr_scheduler.transformer_lr_scheduler import TransformerLRScheduler
 from dataclasses import dataclass
 from typing import List, Set, Callable
+
+from xmlc.utils import build_sparse_tensor
 from .plt import ProbabilisticLabelTree
 from .tree_utils import (
     propagate_labels_to_level,
@@ -59,22 +62,6 @@ class End2EndTrainerModule(pl.LightningModule):
         # save model
         self.model = model
 
-        # Set optimizer
-        # self.automatic_optimization = False
-        # self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-10)
-        # scheduler = torch.optim.lr_scheduler.LinearLR(
-        #     self.optimizer, start_factor=0.5, total_iters=4)
-
-        # self.scheduler = TransformerLRScheduler(
-        #     optimizer=self.optimizer,
-        #     init_lr=1e-10,
-        #     peak_lr=0.01,
-        #     final_lr=1e-5,
-        #     final_lr_scale=0.05,
-        #     warmup_steps=100,
-        #     decay_steps=200,
-        # )
-
         # create datasets
         self.train_dataset = MultiLabelDataset(
             input_dataset=train_data.inputs,
@@ -102,18 +89,11 @@ class End2EndTrainerModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        # opt = self.optimizers()
-        # opt.zero_grad()
-
         # pop labels from batch and predict
         labels = batch.pop('labels')
         out = self.model(**batch)
         # compute loss and log it
         loss = F.binary_cross_entropy(out.probs[out.mask], labels[out.mask])
-
-        # self.manual_backward(loss)
-        # opt.step()
-        # self.scheduler.step()
 
         self.log("train_loss", loss, on_step=True, prog_bar=False, logger=True)
         # return loss
@@ -180,7 +160,8 @@ class LevelTrainerModule(pl.LightningModule):
                  val_batch_size: int,
                  metrics: Callable,
                  lr_encoder: float,
-                 lr_classifier: float
+                 lr_classifier: float,
+                 bag_group_size: int
                  ) -> None:
         # initialize lightning module
         super().__init__()
@@ -202,6 +183,7 @@ class LevelTrainerModule(pl.LightningModule):
         # save optimizer parameters
         self.lr_encoder = lr_encoder
         self.lr_classifier = lr_classifier
+        self.bag_group_size = bag_group_size
 
     def configure_optimizers(self):
         optimizer_config = []
@@ -215,18 +197,33 @@ class LevelTrainerModule(pl.LightningModule):
         return torch.optim.Adam(optimizer_config)
 
     def train_dataloader(self) -> DataLoader:
-        # build the dataset and the dataloader from it
+
         dataset = self.build_dataset(self.train_data)
-        return DataLoader(dataset, batch_size=self.train_batch_size, shuffle=True, num_workers=4)
+
+        if self.bag_group_size is not None:
+            return DataLoader(dataset, batch_sampler=Inter_Bag_Sampler(dataset.get_class_indices(), self.bag_group_size, self.train_batch_size), num_workers=8)
+        else:
+            # build the dataset and the dataloader from it
+
+            return DataLoader(dataset, batch_size=self.train_batch_size, shuffle=True, num_workers=8)
 
     def val_dataloader(self) -> DataLoader:
         # build the dataset and the dataloader from it
         dataset = self.build_dataset(self.val_data)
-        return DataLoader(dataset, batch_size=self.val_batch_size, shuffle=False, num_workers=4)
+        return DataLoader(dataset, batch_size=self.val_batch_size, shuffle=False, num_workers=8)
 
     def training_step(self, batch, batch_idx):
         # pop labels from batch and predict
         labels = batch.pop('labels')
+        num_labels = labels.shape[1]
+
+        if self.bag_group_size is not None:
+            # Predict intersection of labels
+            labels = labels.view(self.bag_group_size, -
+                                 1, num_labels)
+            labels = labels.sum(dim=1)
+            labels = (labels >= self.bag_group_size-0.5).float()
+
         logits = self.classifier(**batch)
         # compute loss and log it
         loss = F.binary_cross_entropy_with_logits(logits, labels)
@@ -279,6 +276,7 @@ class LevelTrainerModule(pl.LightningModule):
 
     def build_dataset(self, data: InputsAndLabels) -> MultiLabelDataset:
 
+        # NamedTensorDataset, list of lists of labels
         input_dataset, labels = data.inputs, data.labels
         # build a list of all labels in the current level
         label_pool = set(n.data.level_index for n in self.tree.filter_nodes(
@@ -341,3 +339,55 @@ class LevelTrainerModule(pl.LightningModule):
                 groups=groups,
                 group_weights=weights
             )
+
+
+class Inter_Bag_Sampler():
+    # Inspired from https://stackoverflow.com/questions/66065272/customizing-the-batch-with-specific-elements
+    def __init__(self, classes: list, bag_group_size: int, batch_size: int):
+
+        assert((batch_size % bag_group_size) == 0)
+
+        # Only consider classes for inter-bags if they contain more than one example
+        self.classes = [
+            class_indices for class_indices in classes if len(class_indices) > 1]
+        self.bag_group_size = bag_group_size
+        self.batch_size = batch_size
+        self.num_inter_bags = batch_size//bag_group_size
+
+    def num_elements_to_fill(self, num_elements, divisor):
+        rest = num_elements % divisor
+        if rest == 0:
+            return rest
+        else:
+            return divisor - rest
+
+    def __iter__(self):
+        # Fill up each class with random samples from the same class such that we can easily chunk each class
+        classes = [class_indices + random.choices(class_indices, k=self.num_elements_to_fill(
+            len(class_indices), self.bag_group_size)) for class_indices in self.classes]
+        # Shuffle the elements within in each class
+        classes = [random.sample(class_indices, k=len(class_indices))
+                   for class_indices in classes]
+
+        # Compute inter_bags
+        inter_bags = [class_indices[i: i+self.bag_group_size]
+                      for class_indices in classes for i in range(0, len(class_indices), self.bag_group_size)]
+
+        # # Randomly select some inter_bags to rand
+        # inter_bags = inter_bags + random.choices(inter_bags, k=self.num_elements_to_fill(len(inter_bags),self.batch_size*self.inter_bag_size))
+
+        # Shuffle inter_bags
+        inter_bags = random.sample(inter_bags, k=len(inter_bags))
+
+        batches = []
+
+        for i in range(0, len(inter_bags), self.num_inter_bags):
+            batch = []
+            for inter_bag in inter_bags[i:i+self.num_inter_bags]:
+                batch.extend(inter_bag)
+
+            batches.append(batch)
+
+        print(len(batches))
+
+        return iter(batches)
