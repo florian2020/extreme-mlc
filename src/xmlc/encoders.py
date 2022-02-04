@@ -42,7 +42,7 @@ class LSTMEncoder(nn.Module):
         self.c0 = nn.Parameter(torch.zeros(num_layers*2, 1, hidden_size))
 
     def forward(self,
-                input_ids: torch.LongTensor,
+                input_ids: torch.IntTensor,
                 input_mask: torch.BoolTensor
                 ) -> torch.Tensor:
         """
@@ -102,7 +102,7 @@ class LSTMSentenceEncoder(nn.Module):
         )
 
     def forward(self,
-                input_ids: torch.LongTensor,
+                input_ids: torch.IntTensor,
                 input_mask: torch.BoolTensor
                 ) -> torch.Tensor:
         """
@@ -147,7 +147,7 @@ class SentenceTransformerEncoder(nn.Module):
         self.sentence_transformer_model = sent_transformer
 
     def forward(self,
-                input_ids: torch.LongTensor,
+                input_ids: torch.IntTensor,
                 input_mask: torch.BoolTensor
                 ) -> torch.Tensor:
         """

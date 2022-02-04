@@ -227,11 +227,11 @@ if __name__ == '__main__':
     pad_token_id = filtered_vocab["[PAD]".lower()]
 
     # build train input features
-    train_input_ids = torch.LongTensor(
+    train_input_ids = torch.IntTensor(
         convert_tokens_to_ids(filtered_vocab, train_tokenized))
-    val_input_ids = torch.LongTensor(
+    val_input_ids = torch.IntTensor(
         convert_tokens_to_ids(filtered_vocab, val_tokenized))
-    test_input_ids = torch.LongTensor(
+    test_input_ids = torch.IntTensor(
         convert_tokens_to_ids(filtered_vocab, test_tokenized))
 
     # save vocab and embeddings

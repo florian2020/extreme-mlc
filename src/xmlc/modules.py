@@ -43,6 +43,7 @@ class SoftmaxAttention(nn.Module):
                 mask: torch.BoolTensor,
                 label_emb: torch.FloatTensor
                 ) -> torch.FloatTensor:
+
         # compute attention scores
         scores = x @ label_emb.transpose(1, 2)
         scores = scores.masked_fill(~mask.unsqueeze(-1), -1e5)
@@ -66,7 +67,7 @@ class InterBagAttention(nn.Module):
         # shape (num_bag_groups, num_labels, bag_group_size, bag_group_size)
         bag_similarities = x @ x.transpose(2, 3)
 
-        # Subtract one for similarity to oneself
+        # Subtract one for similarity to oneself (which is 1 due to the normalization)
         bag_similarities = bag_similarities.sum(dim=-1) - 1
 
         # shape (num_bag_groups, num_labels, bag_group_size)
@@ -124,7 +125,7 @@ class LabelAttentionClassifierMLP(nn.Module):
     def forward(self,
                 x: torch.FloatTensor,
                 mask: torch.BoolTensor,
-                candidates: torch.LongTensor = None
+                candidates: torch.IntTensor = None
                 ) -> torch.FloatTensor:
         # use all embeddings if no candidates are provided
         if candidates is None:
@@ -183,20 +184,22 @@ class BagAttentionClassifier(nn.Module):
     def forward(self,
                 x: torch.FloatTensor,
                 mask: torch.BoolTensor,
-                candidates: torch.LongTensor = None
+                candidates: torch.IntTensor = None
                 ) -> torch.FloatTensor:
         # use all embeddings if no candidates are provided
         if candidates is None:
             n = self.label_embed.num_embeddings
-            candidates = torch.arange(n).unsqueeze(0)
-            candidates = candidates.repeat(x.size(0), 1)
-            candidates = candidates.to(x.device)
+            candidates = torch.arange(n).to(x.device)
+            # candidates = torch.arange(n).unsqueeze(0)
+            # candidates = candidates.repeat(x.size(0), 1)
+            # candidates = candidates.to(x.device)er
 
-        # get label embeddings and apply attention layer
-        label_emb = self.label_embed(candidates)
+            # get label embeddings and apply attention layer
+            label_emb = self.label_embed(candidates).unsqueeze(0)
 
-        for i in range(label_emb.shape[0]):
-            assert(torch.all(label_emb[0] == label_emb[i]))
+        else:
+            # Assume that candidates are the same for all samples in the batch
+            label_emb = self.label_embed(candidates[0]).unsqueeze(0)
 
         # (num_bags,num_labels,hidden_dim)
         x = self.att(x, mask, label_emb)
@@ -213,10 +216,7 @@ class BagAttentionClassifier(nn.Module):
             # shape (num_bag_groups, num_labels, hidden_dim)
             x = self.inter_bag_att(x)
 
-            label_emb = label_emb[:x.shape[0]]
-            bias = self.bias(candidates).squeeze(-1)[:x.shape[0]]
-        else:
-            bias = self.bias(candidates).squeeze(-1)
+        bias = self.bias(candidates[0]).squeeze(-1)
 
         # (num_bags,num_labels)
         dot_prod = torch.sum(x*label_emb, dim=-1)

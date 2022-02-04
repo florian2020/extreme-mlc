@@ -114,11 +114,11 @@ if __name__ == '__main__':
         tokenized_test_instance_ids, max_instances, max_tokens, padding_idx)
 
     # Ids to tensor
-    tokenized_train_instances_ids = torch.LongTensor(
+    tokenized_train_instances_ids = torch.IntTensor(
         tokenized_train_instances_ids)
-    tokenized_val_instances_ids = torch.LongTensor(
+    tokenized_val_instances_ids = torch.IntTensor(
         tokenized_val_instances_ids)
-    tokenized_test_instance_ids = torch.LongTensor(
+    tokenized_test_instance_ids = torch.IntTensor(
         tokenized_test_instance_ids)
 
     print("Start saving to disk")

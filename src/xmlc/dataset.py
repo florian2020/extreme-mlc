@@ -79,20 +79,32 @@ class MultiLabelDataset(Dataset):
         # gather inputs and labels
         inputs = self.input_dataset[index]
         labels = self.labels[index]
-        # generate candidates and build targets
-        candidates = tuple(self.label_pool if self.sampling_disabled else
-                           self.sample_candidates(index, labels))
-        targets = [int(c in labels) for c in candidates]
-        assert len(candidates) == self.num_candidates
-        # convert to tensors
-        candidates = torch.LongTensor(candidates)
-        targets = torch.FloatTensor(targets)
-        # return all features
-        return {
-            'candidates': candidates,
-            'labels': targets,
-            **inputs
-        }
+
+        if self.sampling_disabled:
+            # If candidates are whole label pool
+            targets = torch.zeros(self.num_candidates, dtype=float)
+            targets[list(labels)] = 1.0
+            return {
+                'candidates': torch.arange(self.num_candidates).int(),
+                'labels': targets,
+                **inputs
+            }
+
+        else:
+            # generate candidates and build targets
+            candidates = tuple(self.label_pool if self.sampling_disabled else
+                               self.sample_candidates(index, labels))
+            targets = [int(c in labels) for c in candidates]
+            assert len(candidates) == self.num_candidates
+            # convert to tensors
+            candidates = torch.IntTensor(candidates)
+            targets = torch.FloatTensor(targets)
+            # return all features
+            return {
+                'candidates': candidates,
+                'labels': targets,
+                **inputs
+            }
 
 
 @dataclass

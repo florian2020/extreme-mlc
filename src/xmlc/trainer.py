@@ -219,10 +219,11 @@ class LevelTrainerModule(pl.LightningModule):
 
         if self.bag_group_size is not None:
             # Predict intersection of labels
-            labels = labels.view(self.bag_group_size, -
-                                 1, num_labels)
+            labels = labels.view(-1, self.bag_group_size, num_labels)
             labels = labels.sum(dim=1)
             labels = (labels >= self.bag_group_size-0.5).float()
+
+            assert(torch.all(torch.sum(labels, dim=1) >= 1))
 
         logits = self.classifier(**batch)
         # compute loss and log it
@@ -347,9 +348,14 @@ class Inter_Bag_Sampler():
 
         assert((batch_size % bag_group_size) == 0)
 
-        # Only consider classes for inter-bags if they contain more than one example
+        # # Only consider classes for inter-bags if they contain more than n examples
+        n = 5
         self.classes = [
-            class_indices for class_indices in classes if len(class_indices) > 1]
+            class_indices for class_indices in classes if len(class_indices) > n]
+
+        print(f'{len(self.classes)} labels will be used to form inter-bags')
+
+        # Store parameters
         self.bag_group_size = bag_group_size
         self.batch_size = batch_size
         self.num_inter_bags = batch_size//bag_group_size
@@ -362,6 +368,7 @@ class Inter_Bag_Sampler():
             return divisor - rest
 
     def __iter__(self):
+
         # Fill up each class with random samples from the same class such that we can easily chunk each class
         classes = [class_indices + random.choices(class_indices, k=self.num_elements_to_fill(
             len(class_indices), self.bag_group_size)) for class_indices in self.classes]
@@ -381,6 +388,7 @@ class Inter_Bag_Sampler():
 
         batches = []
 
+        # Take self.num_inter_bags succeeding inter_bags and put them into one batch
         for i in range(0, len(inter_bags), self.num_inter_bags):
             batch = []
             for inter_bag in inter_bags[i:i+self.num_inter_bags]:
@@ -388,6 +396,6 @@ class Inter_Bag_Sampler():
 
             batches.append(batch)
 
-        print(len(batches))
+        print(f'There are {len(batches)} batches for one epoch')
 
         return iter(batches)
