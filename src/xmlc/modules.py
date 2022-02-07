@@ -1,3 +1,4 @@
+from numpy import record
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -38,16 +39,33 @@ class MLP(nn.Module):
 class SoftmaxAttention(nn.Module):
     """ Linear Softmax Attention Module used in original AttentionXML implementation """
 
+    def __init__(self, record_attention_weights: bool = False):
+        super(SoftmaxAttention, self).__init__()
+
+        self.record_attention_weights = record_attention_weights
+
+        if record_attention_weights:
+            self.attention_weights = []
+
     def forward(self,
                 x: torch.FloatTensor,
                 mask: torch.BoolTensor,
-                label_emb: torch.FloatTensor
+                label_emb: torch.FloatTensor,
+
                 ) -> torch.FloatTensor:
 
         # compute attention scores
         scores = x @ label_emb.transpose(1, 2)
         scores = scores.masked_fill(~mask.unsqueeze(-1), -1e5)
         scores = torch.softmax(scores, dim=-2)
+
+        if self.record_attention_weights:
+            # Attach scores for masked instances
+            # recorded_weights = scores.detach().clone()
+
+            l = [s[mask[i]]
+                 for i, s in enumerate(scores.detach().clone().cpu())]
+            self.attention_weights.extend(l)
         # compute label-aware embeddings
         return scores.transpose(1, 2) @ x
 

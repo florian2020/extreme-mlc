@@ -7,11 +7,12 @@ from treelib import Tree
 from dataclasses import dataclass
 from typing import Callable
 
+
 @dataclass
 class PLTOutput(object):
-    probs:torch.FloatTensor =None
-    candidates:torch.LongTensor =None
-    mask:torch.BoolTensor =None
+    probs: torch.FloatTensor = None
+    candidates: torch.LongTensor = None
+    mask: torch.BoolTensor = None
 
     def cpu(self) -> "PLTOutput":
         # move all to cpu
@@ -20,7 +21,7 @@ class PLTOutput(object):
         self.mask = self.mask.cpu()
         return self
 
-    def topk(self, k:int) -> "PLTOutput":
+    def topk(self, k: int) -> "PLTOutput":
         b = self.probs.size(0)
         batch_idx = torch.arange(b).unsqueeze(1)
         # get the topk predicted candidates
@@ -32,9 +33,12 @@ class PLTOutput(object):
         topk_candidates[~topk_mask] = -1
         # pad all to match k
         pad_shape = (b, k - k_)
-        topk_probs = torch.cat((topk_probs, torch.zeros(pad_shape, device=topk_probs.device)), dim=1)
-        topk_candidates = torch.cat((topk_candidates, -torch.ones(pad_shape, dtype=torch.long, device=topk_candidates.device)), dim=1)
-        topk_mask = torch.cat((topk_mask, torch.zeros(pad_shape, dtype=torch.bool, device=topk_mask.device)), dim=1)
+        topk_probs = torch.cat((topk_probs, torch.zeros(
+            pad_shape, device=topk_probs.device)), dim=1)
+        topk_candidates = torch.cat(
+            (topk_candidates, -torch.ones(pad_shape, dtype=torch.long, device=topk_candidates.device)), dim=1)
+        topk_mask = torch.cat((topk_mask, torch.zeros(
+            pad_shape, dtype=torch.bool, device=topk_mask.device)), dim=1)
         # return topk output
         return PLTOutput(
             probs=topk_probs,
@@ -42,13 +46,14 @@ class PLTOutput(object):
             mask=topk_mask
         )
 
+
 class ProbabilisticLabelTree(nn.Module):
     """ Probabilistic Label Tree """
 
     def __init__(
         self,
-        tree:Tree,
-        cls_factory:Callable[[int], nn.Module]
+        tree: Tree,
+        cls_factory: Callable[[int], nn.Module]
     ) -> None:
         # initialize module
         super(ProbabilisticLabelTree, self).__init__()
@@ -57,7 +62,7 @@ class ProbabilisticLabelTree(nn.Module):
             cls_factory(num_labels)
             for i, num_labels in enumerate(
                 map(len, yield_tree_levels(tree)
-            )) if i > 0 # ignore root
+                    )) if i > 0  # ignore root
         ])
 
         # build group-membership per level
@@ -71,7 +76,7 @@ class ProbabilisticLabelTree(nn.Module):
                 }), requires_grad=False
             )
             for i, level in enumerate(yield_tree_levels(tree, max_depth=tree.depth()))
-            if i > 0 # ignore first layer as it has only one group
+            if i > 0  # ignore first layer as it has only one group
         ])
         # build level members
         self.level_members = nn.ParameterList([
@@ -79,13 +84,13 @@ class ProbabilisticLabelTree(nn.Module):
                 [m.data.level_index for m in level]
             ), requires_grad=False)
             for i, level in enumerate(yield_tree_levels(tree))
-            if i > 0 # ignore first layer as it has only one member (the root)
+            if i > 0  # ignore first layer as it has only one member (the root)
         ])
 
-    def get_classifier(self, level:int) -> nn.Module:
+    def get_classifier(self, level: int) -> nn.Module:
         return self.classifiers[level]
 
-    def num_labels(self, level:int=-1) -> int:
+    def num_labels(self, level: int = -1) -> int:
         return self.level_members[level].size(0)
 
     @property
@@ -93,12 +98,12 @@ class ProbabilisticLabelTree(nn.Module):
         return len(self.level_members) + 1
 
     def forward(
-        self, 
-        *args, 
-        topk:int=-1, 
-        candidates:torch.LongTensor =None,
-        candidates_mask:torch.BoolTensor =None,
-        restrict_depth:int =None, 
+        self,
+        *args,
+        topk: int = -1,
+        candidates: torch.LongTensor = None,
+        candidates_mask: torch.BoolTensor = None,
+        restrict_depth: int = None,
         **kwargs
     ) -> PLTOutput:
 
@@ -110,34 +115,34 @@ class ProbabilisticLabelTree(nn.Module):
         if candidates is not None:
             # create candidate mask if not provided
             candidates_mask = torch.ones_like(candidates, dtype=torch.bool) \
-                    if candidates_mask is None else candidates_mask
+                if candidates_mask is None else candidates_mask
             # candidate-based prediction
             return self.forward_candidates(
-                *args, 
+                *args,
                 candidates=candidates,
                 candidates_mask=candidates_mask,
-                restrict_depth=restrict_depth, 
+                restrict_depth=restrict_depth,
                 **kwargs
             )
-            
+
         else:
             # topk-based prediction
             return self.forward_topk(
-                *args, 
-                topk=topk if topk > 0 else float('inf'), 
-                restrict_depth=restrict_depth, 
+                *args,
+                topk=topk if topk > 0 else float('inf'),
+                restrict_depth=restrict_depth,
                 **kwargs
             )
 
     def forward_candidates(
         self,
         *args,
-        candidates:torch.LongTensor,
-        candidates_mask:torch.BoolTensor,
-        restrict_depth:int,
+        candidates: torch.LongTensor,
+        candidates_mask: torch.BoolTensor,
+        restrict_depth: int,
         **kwargs
     ) -> PLTOutput:
-        
+
         # build the paths for all candidates
         # by propagating them up the tree
         shape = (self.num_levels-1, *candidates.size())
@@ -155,16 +160,15 @@ class ProbabilisticLabelTree(nn.Module):
             logits = logits.masked_fill(~candidates_mask, -1e5)
             # update probabilities
             probs *= torch.sigmoid(logits)
-            
+
         # return output
         return PLTOutput(probs=probs, candidates=candidates, mask=candidates_mask)
-            
-            
+
     def forward_topk(
         self,
-        *args, 
-        topk:int, 
-        restrict_depth:int, 
+        *args,
+        topk: int,
+        restrict_depth: int,
         **kwargs
     ) -> PLTOutput:
         # predict very first layer
@@ -186,21 +190,26 @@ class ProbabilisticLabelTree(nn.Module):
 
             # select the top-k groups
             # TODO: do we want the accumulated probs here or the non-accumulated logits
-            _, selected_group_idx = torch.topk(probs, k=min(topk, logits.size(-1)), dim=-1)
+            _, selected_group_idx = torch.topk(
+                probs, k=min(topk, logits.size(-1)), dim=-1)
             selected_groups = group_pool[batch_idx, selected_group_idx]
 
             # build the candidate mask by choosing all group members from the selected groups
-            candidate_mask = (group_membership[None, None, :] == selected_groups[:, :, None])
+            candidate_mask = (
+                group_membership[None, None, :] == selected_groups[:, :, None])
             candidate_mask = candidate_mask.any(dim=1)
             # map each candidate to the group it comes from
-            candidate_group_membership = [group_membership[mask] for mask in candidate_mask]
-            candidate_group_membership = pad_sequence(candidate_group_membership, batch_first=True, padding_value=-1)
+            candidate_group_membership = [
+                group_membership[mask] for mask in candidate_mask]
+            candidate_group_membership = pad_sequence(
+                candidate_group_membership, batch_first=True, padding_value=-1)
             # gather candidates and pad them
             candidates = [members[mask] for mask in candidate_mask]
-            candidates = pad_sequence(candidates, batch_first=True, padding_value=-1)
+            candidates = pad_sequence(
+                candidates, batch_first=True, padding_value=-1)
             # create mask for valid candidates
             padding_mask = (candidates == -1)
-            candidates[padding_mask] = 0 # label-embedding cannot handle -1
+            candidates[padding_mask] = 0  # label-embedding cannot handle -1
 
             # apply classifier for current level and apply padding-mask
             logits = cls(*args, **kwargs, candidates=candidates)
@@ -218,4 +227,3 @@ class ProbabilisticLabelTree(nn.Module):
 
         # return last level output
         return PLTOutput(probs=probs, candidates=group_pool, mask=~padding_mask)
-

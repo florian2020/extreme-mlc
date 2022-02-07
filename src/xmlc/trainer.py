@@ -349,7 +349,7 @@ class Inter_Bag_Sampler():
         assert((batch_size % bag_group_size) == 0)
 
         # # Only consider classes for inter-bags if they contain more than n examples
-        n = 5
+        n = 10
         self.classes = [
             class_indices for class_indices in classes if len(class_indices) > n]
 

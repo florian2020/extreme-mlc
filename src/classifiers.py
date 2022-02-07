@@ -19,7 +19,7 @@ import torch
 
 
 class Classifier(nn.Module):
-    """ Combination of a Sentence-Transformer-encoder and a simple attention-based
+    """ Combination of an encoder and a simple attention-based
         Multi-label Classifier Module
     """
 
@@ -27,7 +27,8 @@ class Classifier(nn.Module):
                  num_labels: int,
                  model_params,
                  padding_idx,
-                 emb_init
+                 emb_init,
+                 record_attention_weights: bool,
                  ) -> None:
         # initialize module
         super(Classifier, self).__init__()
@@ -76,7 +77,7 @@ class Classifier(nn.Module):
         attention_module = {
             'softmax-attention': SoftmaxAttention,
             'multi-head-attention': MultiHeadAttention
-        }[model_params['attention']['type']]()
+        }[model_params['attention']['type']](record_attention_weights)
 
         if model_params['classifier']['type'] == 'mlp':
             self.mlp_layers = [
@@ -145,13 +146,16 @@ class ClassifierFactory(object):
     # Creates a model with sentence transformer as encoder, attention Layer and a
     # succeding linear layer
 
-    def __init__(self, model_params, padding_idx,
-                 emb_init
+    def __init__(self, model_params,
+                 padding_idx,
+                 emb_init,
+                 record_attention_weights: bool = False
                  ) -> None:
 
         self.model_params = model_params
         self.padding_idx = padding_idx
         self.emb_init = emb_init
+        self.record_attention_weights = record_attention_weights
 
     def create(self, num_labels: int) -> Classifier:
 
@@ -159,7 +163,8 @@ class ClassifierFactory(object):
             num_labels=num_labels,
             model_params=self.model_params,
             padding_idx=self.padding_idx,
-            emb_init=self.emb_init
+            emb_init=self.emb_init,
+            record_attention_weights=self.record_attention_weights
         )
 
     def __call__(self, num_labels: int) -> Classifier:
@@ -167,6 +172,6 @@ class ClassifierFactory(object):
 
     @ staticmethod
     def from_params(model_params, padding_idx,
-                    emb_init):
+                    emb_init, record_attention_weights):
         return ClassifierFactory(model_params, padding_idx,
-                                 emb_init)
+                                 emb_init, record_attention_weights)

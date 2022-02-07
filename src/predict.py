@@ -44,6 +44,35 @@ def predict(
     )
 
 
+def analyse_attention_weights(model):
+    # Only analyses the attention of the top-level classifier
+    classifier = model.get_classifier(0)
+
+    # list and elements have different dims: (num_instances, num_labels)
+    attention_scores = classifier.cls.att.attention_weights
+
+    # Assert that attention weights sum to one
+    l = [t.sum(dim=0) for t in attention_scores]
+    l = torch.stack(l, dim=0)
+    check_sum = torch.all(l > 0.99)
+    assert(check_sum)
+
+    # Dim (num_samples, num_labels)
+    # Average attention vectors for all main paragraphs
+    attention_scores2 = torch.stack([
+        t[2:-1].mean(dim=0) for t in attention_scores], dim=0)
+    attention_scores0 = torch.stack([t[0] for t in attention_scores], dim=0)
+    attention_scores1 = torch.stack([t[1] for t in attention_scores], dim=0)
+    attention_scores3 = torch.stack([t[-1] for t in attention_scores], dim=0)
+
+    # Shape (4, num_labels)
+    # attention_array = np.vstack((attention_scores0.mean(dim=1),
+    #                              attention_scores1.mean(dim=1), attention_scores2.mean(dim=1), attention_scores3.mean(dim=1)))
+
+    return [attention_scores0.mean().item(), attention_scores1.mean().item(),
+            attention_scores2.mean().item(), attention_scores3.mean().item()]
+
+
 if __name__ == '__main__':
 
     print("Start predicting")
@@ -56,15 +85,16 @@ if __name__ == '__main__':
                         help="Path to the preprocessed test data.")
     parser.add_argument("--model-path", type=str,
                         help="Path to the trained model.")
-    parser.add_argument("--model-type", type=str,
-                        help="Type of the model which was trained")
     parser.add_argument("--label-tree", type=str,
                         help="Path to the label tree")
-    parser.add_argument("--vocab", type=str, help="Path to the vocabulary.")
+    parser.add_argument("--vocab", type=str,
+                        help="Path to the vocabulary.")
     parser.add_argument("--embed", type=str,
                         help="Path to the pretrained embedding vectors.")
     parser.add_argument("--output-dir", type=str,
                         help="Path to the output directory.")
+    parser.add_argument("--record_attention_weights", type=bool,
+                        help="Choose if you want to get an analysis of the attention weights")
     # parse arguments
     args = parser.parse_args()
 
@@ -100,7 +130,7 @@ if __name__ == '__main__':
             emb_init = np.load(args.embed)
 
         test_data = load_data_mil(data_path=args.test_data,
-                                padding_idx=padding_idx)
+                                  padding_idx=padding_idx)
 
     elif params['model']['encoder']['type'] == 'lstm':
         # load vocabulary
@@ -118,7 +148,8 @@ if __name__ == '__main__':
         cls_factory=ClassifierFactory.from_params(
             model_params=params['model'],
             padding_idx=padding_idx,
-            emb_init=emb_init
+            emb_init=emb_init,
+            record_attention_weights=args.record_attention_weights
         )
     )
 
@@ -133,6 +164,14 @@ if __name__ == '__main__':
                      k=params['trainer']['topk'],
                      device='cuda' if torch.cuda.is_available() else 'cpu'
                      )
+
+    if args.record_attention_weights:
+        instance_attention_weights = analyse_attention_weights(model)
+
+        with open(os.path.join(
+                args.output_dir, "instance_attention_weights.json"), 'w') as f:
+            json.dump(instance_attention_weights, f)
+
     # save predictions to disk
     torch.save(output.candidates, os.path.join(
         args.output_dir, "predictions.pkl"))
