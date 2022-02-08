@@ -172,6 +172,6 @@ class ClassifierFactory(object):
 
     @ staticmethod
     def from_params(model_params, padding_idx,
-                    emb_init, record_attention_weights):
+                    emb_init, record_attention_weights=False):
         return ClassifierFactory(model_params, padding_idx,
                                  emb_init, record_attention_weights)
