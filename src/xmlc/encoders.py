@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sentence_transformers import SentenceTransformer
+from transformers import AutoModel
 
 
 class LSTMEncoder(nn.Module):
@@ -136,15 +136,26 @@ class LSTMSentenceEncoder(nn.Module):
         return x[:, :, -1, :]
 
 
+# Similar to https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+def mean_pooling(x, attention_mask):
+    input_mask_expanded = attention_mask.unsqueeze(
+        -1).expand(x.size()).float()
+    return torch.sum(x * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
+
 class SentenceTransformerEncoder(nn.Module):
     """ Basic Sentence Transformer Encoder """
 
     def __init__(self,
-                 sent_transformer: SentenceTransformer
+                 sent_transformer_name: str,
+                 dropout
                  ) -> None:
         super(SentenceTransformerEncoder, self).__init__()
 
-        self.sentence_transformer_model = sent_transformer
+        self.sentence_transformer_model = AutoModel.from_pretrained(
+            f'sentence-transformers/{sent_transformer_name}')
+
+        self.dropout = dropout
 
     def forward(self,
                 input_ids: torch.IntTensor,
@@ -163,13 +174,16 @@ class SentenceTransformerEncoder(nn.Module):
         input_mask_without_instances = input_mask.view(
             batch_size * num_instances, num_tokens)
 
-        model_output = self.sentence_transformer_model(
-            {'input_ids': input_ids_without_instances, 'attention_mask': input_mask_without_instances})
+        # First element of model_output contains all token embeddings
+        x = self.sentence_transformer_model(
+            **{'input_ids': input_ids_without_instances, 'attention_mask': input_mask_without_instances})[0]
 
-        sentence_embeddings = model_output['sentence_embedding']
+        x = F.dropout(x, p=self.dropout, training=self.training)
 
+        x = mean_pooling(
+            x, input_mask_without_instances)
         # Recover instance dimension
-        sentence_embeddings = sentence_embeddings.view(
+        x = x.view(
             batch_size, num_instances, -1)
 
-        return sentence_embeddings
+        return x
