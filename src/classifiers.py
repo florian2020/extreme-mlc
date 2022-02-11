@@ -37,12 +37,10 @@ class Classifier(nn.Module):
 
         if self.encoder_type == 'sentence-transformer':
 
-            sentence_transformer = SentenceTransformer(
-                model_params['encoder']['name'])
-
             # create lstm encoder
             self.enc = SentenceTransformerEncoder(
-                sent_transformer=sentence_transformer
+                sent_transformer_name=model_params['encoder']['name'],
+                dropout=model_params['encoder']['dropout']
             )
 
             classifier_input_dim = model_params['encoder']['output_dim']
@@ -132,7 +130,7 @@ class Classifier(nn.Module):
 
     def forward(self, input_ids, input_mask, instances_mask=None, candidates=None):
         # apply encoder and pass output through classifer
-        x = self.enc(input_ids, input_mask)
+        x = self.enc(input_ids, input_mask, instances_mask)
 
         if self.encoder_type in {'lstm'}:
             classifier_mask = input_mask

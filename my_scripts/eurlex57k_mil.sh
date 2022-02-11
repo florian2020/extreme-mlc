@@ -2,7 +2,7 @@
 
 
 preprocessed_dir=./data/preprocessed/EURLEX57K_mil_all-MiniLM-L6-v2
-results_dir=./results/EURLEX57K_full_mil_4
+results_dir=./results/EURLEX57K_full_mil_unnormalized
 
 
 # python src/preprocess_sentence_transformer.py \

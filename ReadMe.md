@@ -18,6 +18,7 @@
 |AttentionXML own implementation (emb trainable) |92.0|85.7|82.1|
 |AttentionXML own implementation (emb not trainable) |91.9|85.4|81.8|
 |LSTM Encoder full text with intra bag|88.4|81.1|77.1|
+|all-MiniLm-L6-v2 (lr 1e-5) and intra-bag (lr 1e-3), dropout 0.5|92.1|85.3|81.1|
 |all-MiniLm-L6-v2 (lr 1e-5) and intra-bag (lr 1e-3)|91.7|85.3|81.1|
 |all-MiniLm-L6-v2 (lr 1e-5) and mlp (lr 1e-3)|90.3|83.8|80.1|
 |LSTM Sentence Encoder Mean and MLP (lr 1e-3)|90.0|83.2|79.2|
