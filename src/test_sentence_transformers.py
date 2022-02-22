@@ -1,6 +1,5 @@
 # File to do small test on the behaviour of sentence transformers
 
-
 from transformers import AutoTokenizer, AutoModel
 from sentence_transformers import SentenceTransformer, util
 import torch
@@ -10,88 +9,38 @@ import json
 from tqdm import tqdm
 
 # Mean Pooling - Take attention mask into account for correct averaging
+# Similar to https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
 
 
-def mean_pooling(model_output, attention_mask):
-    # First element of model_output contains all token embeddings
-    token_embeddings = model_output[0]
+def mean_pooling(x, attention_mask):
     input_mask_expanded = attention_mask.unsqueeze(
-        -1).expand(token_embeddings.size()).float()
-    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+        -1).expand(x.size()).float()
+    return torch.sum(x * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
 
-path = './data/datasets/EURLEX57K_tiny_mil/train_texts.json'
-
-texts = []
-max_instances = 0
-# with open(path, "r") as f:
-#     for line in tqdm(f, f'Loading texts from {path}'):
-#         instances = json.loads(line)
-#         texts.append(instances)
-
-#         if len(instances) > max_instances:
-#             max_instances = len(instances)
-
-texts = []
 # Load model from HuggingFace Hub
 tokenizer = AutoTokenizer.from_pretrained(
     'sentence-transformers/all-MiniLM-L6-v2')
-model = AutoModel.from_pretrained(
-    'sentence-transformers/all-MiniLM-L6-v2')
-
-pytorch_total_params = sum(p.numel() for p in model.parameters())
-
-pytorch_trainable_params = sum(p.numel()
-                               for p in model.parameters() if p.requires_grad == True)
+model = SentenceTransformer('all-MiniLM-L12-v2')
+# model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
 
 
-print("Num parameters: ", pytorch_total_params)
-print("Num trainable params: ", pytorch_trainable_params)
+texts = ["This is a first sentence. And this is another one.", 'Second sentence']
 
-# model = SentenceTransformer('all-MiniLM-L12-v2')
-
-
-texts = ["This is a first sentence. And this is another one.",
-         "This is a second paragraph"]
-
-records = []
-
-
-# print(type(tokenizer))
-for property, value in vars(model).items():
-    print(property, ":", value)
 
 # Tokenize sentences
 tokenizer_output = tokenizer(texts, padding=True,
                              truncation=True, return_tensors='pt')
 
-# encoded_input = tokenizer_output['input_ids']
+model_out = model(tokenizer_output)
 
-# encoded_input = tokenizer(sentences, padding=True,
-#                           truncation=True, return_attention_mask=False)['input_ids']
+x = mean_pooling(
+    model_out['token_embeddings'], tokenizer_output['attention_mask'])
 
-# encoded_input.extend([[1]*len(encoded_input[0])])
+x = x/x.norm(dim=-1, keepdim=True)
 
-# encoded_input = torch.LongTensor(encoded_input)
 
-# attention_mask = (encoded_input != 1)
-
-# Compute token embeddings
-with torch.no_grad():
-    # model_output = model(input_ids=encoded_input,
-    #                      attention_mask=attention_mask)
-    model_output = model(tokenizer_output)
-
-# # Perform pooling
-# sentence_embeddings = mean_pooling(
-#     model_output, attention_mask)
-
-# # Normalize embeddings
-# sentence_embeddings = F.normalize(sentence_embeddings, p=2, dim=1)
-
-# records.append(sentence_embeddings)
-
+print("Token embeddings:")
+print(x[0, :20])
 print("Sentence embeddings:")
-print(model_output)
-# print(sentence_embeddings@sentence_embeddings.T)
-# print(sentence_embeddings.shape)
+print(model_out['sentence_embedding'][0, :20])

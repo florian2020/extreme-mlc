@@ -36,6 +36,12 @@ class MLP(nn.Module):
         return self.layers[-1](x)
 
 
+def normalize(x):
+    n = torch.norm(x, dim=-1, keepdim=True)
+    n[n <= 1e-5] = 1
+    return x/n
+
+
 class SoftmaxAttention(nn.Module):
     """ Linear Softmax Attention Module used in original AttentionXML implementation """
 
@@ -53,6 +59,10 @@ class SoftmaxAttention(nn.Module):
                 label_emb: torch.FloatTensor,
 
                 ) -> torch.FloatTensor:
+
+        # Normalization to unit length
+        x = normalize(x)
+        label_emb = normalize(label_emb)
 
         # compute attention scores
         scores = x @ label_emb.transpose(1, 2)
@@ -222,8 +232,8 @@ class BagAttentionClassifier(nn.Module):
         # (num_bags,num_labels,hidden_dim)
         x = self.att(x, mask, label_emb)
 
-        # Normalize each sample
-        x = x / torch.norm(x, dim=2, keepdim=True)
+        # Deprecated: Normalization after attention
+        # x = x / torch.norm(x, dim=-1, keepdim=True)
 
         # Inter-Bag during training
         if self.training and self.bag_group_size is not None:

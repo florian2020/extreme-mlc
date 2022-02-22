@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import torch
 import time
+import matplotlib.pyplot as plt
 from datetime import timedelta
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
@@ -44,7 +45,7 @@ def predict(
     )
 
 
-def analyse_attention_weights(model):
+def analyse_attention_weights(model, save_folder):
     # Only analyses the attention of the top-level classifier
     classifier = model.get_classifier(0)
 
@@ -59,18 +60,28 @@ def analyse_attention_weights(model):
 
     # Dim (num_samples, num_labels)
     # Average attention vectors for all main paragraphs
-    attention_scores2 = torch.stack([
-        t[2:-1].mean(dim=0) for t in attention_scores], dim=0)
-    attention_scores0 = torch.stack([t[0] for t in attention_scores], dim=0)
-    attention_scores1 = torch.stack([t[1] for t in attention_scores], dim=0)
-    attention_scores3 = torch.stack([t[-1] for t in attention_scores], dim=0)
+    attention_scores2 = np.stack([
+        t[2:-1].mean(dim=0) for t in attention_scores], axis=0)
+    attention_scores0 = np.stack([t[0] for t in attention_scores], axis=0)
+    attention_scores1 = np.stack([t[1] for t in attention_scores], axis=0)
+    attention_scores3 = np.stack([t[-1] for t in attention_scores], axis=0)
 
-    # Shape (4, num_labels)
-    # attention_array = np.vstack((attention_scores0.mean(dim=1),
-    #                              attention_scores1.mean(dim=1), attention_scores2.mean(dim=1), attention_scores3.mean(dim=1)))
+    l = [attention_scores0, attention_scores1,
+         attention_scores2, attention_scores3]
 
-    return [attention_scores0.mean().item(), attention_scores1.mean().item(),
-            attention_scores2.mean().item(), attention_scores3.mean().item()]
+    plt.boxplot([attention_score.mean(axis=0) for attention_score in l])
+    plt.savefig(os.path.join(
+        save_folder, f"instance_attention_weights_labels_boxplot.pdf"))
+    plt.clf()
+
+    plt.boxplot([attention_score.mean(axis=1) for attention_score in l])
+    plt.savefig(os.path.join(
+        save_folder, f"instance_attention_weights_samples_dist.pdf"))
+    plt.clf()
+
+    with open(os.path.join(
+            save_folder, "instance_attention_weights.json"), 'w') as f:
+        json.dump([attention_score.mean().item() for attention_score in l], f)
 
 
 if __name__ == '__main__':
@@ -166,11 +177,8 @@ if __name__ == '__main__':
                      )
 
     if args.record_attention_weights:
-        instance_attention_weights = analyse_attention_weights(model)
-
-        with open(os.path.join(
-                args.output_dir, "instance_attention_weights.json"), 'w') as f:
-            json.dump(instance_attention_weights, f)
+        analyse_attention_weights(
+            model, args.output_dir)
 
     # save predictions to disk
     torch.save(output.candidates, os.path.join(
