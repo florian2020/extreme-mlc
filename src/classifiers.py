@@ -40,7 +40,8 @@ class Classifier(nn.Module):
             # create lstm encoder
             self.enc = SentenceTransformerEncoder(
                 sent_transformer_name=model_params['encoder']['name'],
-                dropout=model_params['encoder']['dropout']
+                dropout=model_params['encoder']['dropout'],
+                normalize_sentence_emb=model_params['encoder']['normalize_sentences']
             )
 
             classifier_input_dim = model_params['encoder']['output_dim']
@@ -75,7 +76,7 @@ class Classifier(nn.Module):
         attention_module = {
             'softmax-attention': SoftmaxAttention,
             'multi-head-attention': MultiHeadAttention
-        }[model_params['attention']['type']](record_attention_weights)
+        }[model_params['attention']['type']](record_attention_weights=record_attention_weights)
 
         if model_params['classifier']['type'] == 'mlp':
             self.mlp_layers = [
@@ -99,16 +100,13 @@ class Classifier(nn.Module):
             )
         elif model_params['classifier']['type'] == 'bag':
 
-            if 'bag_group_size' in model_params['classifier']:
-                bag_group_size = model_params['classifier']['bag_group_size']
-            else:
-                bag_group_size = None
-
             self.cls = BagAttentionClassifier(
                 encoder_hidden_size=classifier_input_dim,
                 num_labels=num_labels,
                 attention=attention_module,
-                bag_group_size=bag_group_size
+                bag_group_size=model_params['classifier']['bag_group_size'],
+                normalize_bags=model_params['classifier']['normalize_bags'],
+                normalize_labels=model_params['classifier']['normalize_labels']
             )
         else:
             AssertionError("Your chosen classifier type is not supported")

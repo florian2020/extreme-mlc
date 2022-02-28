@@ -150,7 +150,7 @@ def train_levelwise(
     train_data: InputsAndLabels,
     val_data: InputsAndLabels,
     params: Dict[str, Any],
-    bag_group_size,
+    bag_group_size: int,
     output_dir: str
 ) -> LogHistory:
     # use gpu if possible
@@ -261,6 +261,7 @@ if __name__ == '__main__':
                                    padding_idx=padding_idx)
         val_data = load_data_mil(
             data_path=args.val_data, padding_idx=padding_idx)
+        bag_group_size = params['model']['classifier']['bag_group_size']
 
     elif params['model']['encoder']['type'] == 'lstm-mil':
         with open(args.vocab, "r") as f:
@@ -273,6 +274,7 @@ if __name__ == '__main__':
                                    padding_idx=padding_idx)
         val_data = load_data_mil(
             data_path=args.val_data, padding_idx=padding_idx)
+        bag_group_size = 1
 
     elif params['model']['encoder']['type'] == 'lstm':
         with open(args.vocab, "r") as f:
@@ -284,6 +286,7 @@ if __name__ == '__main__':
         train_data = load_data(data_path=args.train_data,
                                padding_idx=padding_idx)
         val_data = load_data(data_path=args.val_data, padding_idx=padding_idx)
+        bag_group_size = 1
     else:
         AssertionError("This is not a supported encoder type.")
 
@@ -306,11 +309,6 @@ if __name__ == '__main__':
     training_regime = {
         "levelwise": train_levelwise,
     }[params['trainer']['regime']]
-
-    if 'bag_group_size' in params['model']['classifier']:
-        bag_group_size = params['model']['classifier']['bag_group_size']
-    else:
-        bag_group_size = None
 
     # train model
     history = training_regime(

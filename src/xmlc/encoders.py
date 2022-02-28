@@ -150,7 +150,8 @@ class SentenceTransformerEncoder(nn.Module):
 
     def __init__(self,
                  sent_transformer_name: str,
-                 dropout
+                 dropout,
+                 normalize_sentence_emb
                  ) -> None:
         super(SentenceTransformerEncoder, self).__init__()
 
@@ -158,36 +159,45 @@ class SentenceTransformerEncoder(nn.Module):
         self.sentence_transformer_model = SentenceTransformer(
             f'sentence-transformers/{sent_transformer_name}')
 
+        # Uncomment to freeze weights
+        # for param in self.sentence_transformer_model.parameters():
+        #     param.requires_grad = False
+
         self.dropout = dropout
+        self.normalize = normalize_sentence_emb
 
     def forward(self,
                 input_ids: torch.IntTensor,
                 input_mask: torch.BoolTensor,
-                instances_mask_expanded: torch.BoolTensor
+                instances_mask: torch.BoolTensor
                 ) -> torch.Tensor:
         """
         Input shape: (batch_size,num_instances,num_tokens)
-        Output shape: (batch_size,num_instances,hidden_size)
+        Output shape: (batch_size,num_instances,hidden_size) unnormalized
         """
 
         batch_size, num_instances, num_tokens = input_ids.shape
 
         # Flatten instance dimension of input and mask
-        input_ids_without_instances = input_ids.view(
+        input_ids_expanded = input_ids.view(
             batch_size * num_instances, num_tokens)
-        input_mask_without_instances = input_mask.view(
+        input_mask_expanded = input_mask.view(
             batch_size * num_instances, num_tokens)
-        instances_mask_expanded = instances_mask_expanded.view(
+        instances_mask_expanded = instances_mask.view(
             batch_size * num_instances)
 
+        # Only pass non-empty instances through model
         model_out = self.sentence_transformer_model(
-            {'input_ids': input_ids_without_instances[instances_mask_expanded], 'attention_mask': input_mask_without_instances[instances_mask_expanded]})['token_embeddings']
+            {'input_ids': input_ids_expanded[instances_mask_expanded], 'attention_mask': input_mask_expanded[instances_mask_expanded]})['token_embeddings']
 
         model_out = F.dropout(model_out, p=self.dropout,
                               training=self.training)
 
         model_out = mean_pooling(
-            model_out, input_mask_without_instances[instances_mask_expanded])
+            model_out, input_mask_expanded[instances_mask_expanded])
+
+        if self.normalize:
+            model_out = F.normalize(model_out, p=2, dim=-1, eps=1e-6)
 
         x = torch.zeros((batch_size * num_instances,
                         model_out.shape[-1])).to(model_out.device)

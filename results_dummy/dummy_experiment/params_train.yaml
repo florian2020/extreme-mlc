@@ -4,12 +4,16 @@ model:
     name: all-MiniLM-L6-v2
     output_dim: 384
     dropout: 0.0
+    normalize_sentences: True
     
   attention:
     type: softmax-attention
 
   classifier:
     type: bag
+    normalize_bags: True
+    normalize_labels: True
+    bag_group_size: 1
 
 
 trainer:

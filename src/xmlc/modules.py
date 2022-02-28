@@ -36,12 +36,6 @@ class MLP(nn.Module):
         return self.layers[-1](x)
 
 
-def normalize(x):
-    n = torch.norm(x, dim=-1, keepdim=True)
-    n[n <= 1e-5] = 1
-    return x/n
-
-
 class SoftmaxAttention(nn.Module):
     """ Linear Softmax Attention Module used in original AttentionXML implementation """
 
@@ -56,13 +50,8 @@ class SoftmaxAttention(nn.Module):
     def forward(self,
                 x: torch.FloatTensor,
                 mask: torch.BoolTensor,
-                label_emb: torch.FloatTensor,
-
+                label_emb: torch.FloatTensor
                 ) -> torch.FloatTensor:
-
-        # Normalization to unit length
-        x = normalize(x)
-        label_emb = normalize(label_emb)
 
         # compute attention scores
         scores = x @ label_emb.transpose(1, 2)
@@ -71,7 +60,6 @@ class SoftmaxAttention(nn.Module):
 
         if self.record_attention_weights:
             # Attach scores for masked instances
-            # recorded_weights = scores.detach().clone()
 
             l = [s[mask[i]]
                  for i, s in enumerate(scores.detach().clone().cpu())]
@@ -177,6 +165,8 @@ class BagAttentionClassifier(nn.Module):
                  num_labels: int,
                  attention: nn.Module,
                  bag_group_size: int,
+                 normalize_labels: bool,
+                 normalize_bags: bool
                  ) -> None:
         # initialize module
         super(BagAttentionClassifier, self).__init__()
@@ -184,6 +174,8 @@ class BagAttentionClassifier(nn.Module):
         # Store params
         self.num_labels = num_labels
         self.encoder_hidden_size = encoder_hidden_size
+        self.normalize_labels = normalize_labels
+        self.normalize_bags = normalize_bags
 
         # save the attention and mlp module
         self.att = attention
@@ -218,25 +210,27 @@ class BagAttentionClassifier(nn.Module):
         if candidates is None:
             n = self.label_embed.num_embeddings
             candidates = torch.arange(n).to(x.device)
-            # candidates = torch.arange(n).unsqueeze(0)
-            # candidates = candidates.repeat(x.size(0), 1)
-            # candidates = candidates.to(x.device)er
 
-            # get label embeddings and apply attention layer
+            # Assume that candidates are the same for all samples in the batch
             label_emb = self.label_embed(candidates).unsqueeze(0)
 
         else:
             # Assume that candidates are the same for all samples in the batch
             label_emb = self.label_embed(candidates[0]).unsqueeze(0)
 
-        # (num_bags,num_labels,hidden_dim)
-        x = self.att(x, mask, label_emb)
+        if self.normalize_labels:
+            # (num_bags,num_labels,hidden_dim)
+            x = self.att(x, mask, F.normalize(
+                label_emb, p=2, dim=-1, eps=1e-6))
+        else:
+            # (num_bags,num_labels,hidden_dim)
+            x = self.att(x, mask, label_emb)
 
-        # Deprecated: Normalization after attention
-        # x = x / torch.norm(x, dim=-1, keepdim=True)
+        if self.normalize_bags:
+            x = F.normalize(x, p=2, dim=-1, eps=1e-6)
 
         # Inter-Bag during training
-        if self.training and self.bag_group_size is not None:
+        if self.training and self.bag_group_size > 1:
             # Form bag groups
             x = x.view(-1, self.bag_group_size, self.num_labels,
                        self.encoder_hidden_size)

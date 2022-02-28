@@ -200,7 +200,7 @@ class LevelTrainerModule(pl.LightningModule):
 
         dataset = self.build_dataset(self.train_data)
 
-        if self.bag_group_size is not None:
+        if self.bag_group_size > 1:
             return DataLoader(dataset, batch_sampler=Inter_Bag_Sampler(dataset.get_class_indices(), self.bag_group_size, self.train_batch_size), num_workers=8)
         else:
             # build the dataset and the dataloader from it
@@ -217,7 +217,7 @@ class LevelTrainerModule(pl.LightningModule):
         labels = batch.pop('labels')
         num_labels = labels.shape[1]
 
-        if self.bag_group_size is not None:
+        if self.bag_group_size > 1:
             # Predict intersection of labels
             labels = labels.view(-1, self.bag_group_size, num_labels)
             labels = labels.sum(dim=1)

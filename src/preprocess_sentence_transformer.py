@@ -1,5 +1,6 @@
 from transformers import AutoTokenizer, PreTrainedTokenizerFast, BatchEncoding
 import torch
+import numpy as np
 import json
 from tqdm import tqdm
 import os
@@ -8,22 +9,31 @@ import time
 from datetime import timedelta
 
 
-def load_raw_texts(path: str) -> list():
+def load_raw_texts(path: str, concatenate_main_body: bool) -> list():
     """
     Load data where each document is stored as a list of
     sections in a json lines format. Also count on the fly
     the max number of instances for any document.
+
+    concatenate_main_body: indicates whether the subsetcions of the main body should be
+    considered as one or multiple sections
     """
 
     texts = []
-    max_instances = 0
+    max_instances = 4
     with open(path, "r") as f:
         for line in tqdm(f, f'Loading texts from {path}'):
             instances = json.loads(line)
-            texts.append(instances)
 
-            if len(instances) > max_instances:
-                max_instances = len(instances)
+            if concatenate_main_body:
+                texts.append([instances[0], instances[1],
+                             " ".join(instances[2:-1]), instances[-1]])
+
+            else:
+                texts.append(instances)
+
+                if len(instances) > max_instances:
+                    max_instances = len(instances)
 
     return texts, max_instances
 
@@ -40,11 +50,12 @@ def tokenize(tokenizer: PreTrainedTokenizerFast, texts: list(), max_tokens) -> l
 
 def truncate_pad_instances(tokenized_instances_ids, max_instances, max_tokens, padding_token):
     """
-    Pad instances such that all documents have the same number of instances
+    Pad instances such that all documents have the same number of instances.
+    Make sure that independent of the number of instances the attachments are included
     """
 
     return [
-        instances[:max_instances] +
+        [*instances[:min(max_instances-1, len(instances)-1)], instances[-1]] +
         [[padding_token]*max_tokens]*max(0, max_instances - len(instances)) for instances in tokenized_instances_ids
     ]
 
@@ -78,16 +89,17 @@ if __name__ == '__main__':
 
     # Load raw texts
     train_texts, max_train_instances = load_raw_texts(
-        os.path.join(dataset_path, 'train_texts.json'))
+        os.path.join(dataset_path, 'train_texts.json'), params['concatenate_main_body'])
     val_texts, _ = load_raw_texts(
-        os.path.join(dataset_path, 'val_texts.json'))
+        os.path.join(dataset_path, 'val_texts.json'), params['concatenate_main_body'])
     test_texts, _ = load_raw_texts(
-        os.path.join(dataset_path, 'test_texts.json'))
+        os.path.join(dataset_path, 'test_texts.json'), params['concatenate_main_body'])
 
     if max_instances == -1:
         max_instances = max_train_instances
 
-    print(f"The maximum number of instances is {max_instances}")
+    print(
+        f"Maximum {max_instances} instances of each document will be considered.")
 
     if max_tokens == -1:
         max_tokens = tokenizer.model_max_length

@@ -241,12 +241,15 @@ def remove_unfrequent_labels(text_rows, label_rows, labels_to_keep):
     new_label_rows = []
     docs_to_delete = set()
     num_labels_per_doc = []
+    removed_label_counter = 0
 
     for i, label_row in enumerate(label_rows):
         new_label_row = []
         for label in label_row:
             if label in labels_to_keep:
                 new_label_row.append(label)
+            else:
+                removed_label_counter += 1
 
         if len(new_label_row) > 0:
             num_labels_per_doc.append(len(new_label_row))
@@ -257,7 +260,8 @@ def remove_unfrequent_labels(text_rows, label_rows, labels_to_keep):
     text_rows = [text_row for j, text_row in enumerate(
         text_rows) if j not in docs_to_delete]
 
-    print(f"\nNumber of removed examples: {len(docs_to_delete)}")
+    print(f"\nNumber of removed labels: {removed_label_counter}")
+    print(f"Number of removed examples: {len(docs_to_delete)}")
     print(
         f"Number of remaining examples: {len(label_rows)-len(docs_to_delete)}")
     print(
@@ -267,10 +271,10 @@ def remove_unfrequent_labels(text_rows, label_rows, labels_to_keep):
 
 
 if __name__ == '__main__':
-    eurlex57k_to_extreme_mlc_format(source_path="./data/datasets/EURLEX57K_original/",
-                                    target_path="./data/datasets/EURLEX57K_full_min10/",
-                                    min_example_per_label=10)
+    # eurlex57k_to_extreme_mlc_format(source_path="./data/datasets/EURLEX57K_original/",
+    #                                 target_path="./data/datasets/EURLEX57K_full_min10/",
+    #                                 min_example_per_label=10)
 
-    # eurlex57k_to_extreme_milmlc_format(source_path="./data/datasets/EURLEX57K_original/",
-    #                                    target_path="./data/datasets/EURLEX57K_full_mil_min10/",
-    #                                    min_example_per_label=10)
+    eurlex57k_to_extreme_milmlc_format(source_path="./data/datasets/EURLEX57K_original/",
+                                       target_path="./data/datasets/EURLEX57K_full_mil_min10/",
+                                       min_example_per_label=10)

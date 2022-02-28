@@ -69,14 +69,30 @@ def analyse_attention_weights(model, save_folder):
     l = [attention_scores0, attention_scores1,
          attention_scores2, attention_scores3]
 
-    plt.boxplot([attention_score.mean(axis=0) for attention_score in l])
+    plt.boxplot([attention_score.mean(axis=0)
+                for attention_score in l], sym='')
+    plt.xticks([1, 2, 3, 4], ['Header', 'Recitals',
+               'Main body', 'Attachments'])
     plt.savefig(os.path.join(
         save_folder, f"instance_attention_weights_labels_boxplot.pdf"))
+    plt.ylabel('Averaged Attention Weights')
     plt.clf()
 
-    plt.boxplot([attention_score.mean(axis=1) for attention_score in l])
+    plt.boxplot([attention_score.mean(axis=1)
+                for attention_score in l], sym='')
+    plt.xticks([1, 2, 3, 4], ['Header', 'Recitals',
+                              'Main body', 'Attachments'])
+    plt.ylabel('Averaged Attention Weights')
     plt.savefig(os.path.join(
         save_folder, f"instance_attention_weights_samples_dist.pdf"))
+    plt.clf()
+
+    plt.boxplot([attention_score.flatten() for attention_score in l], sym='')
+    plt.xticks([1, 2, 3, 4], ['Header', 'Recitals',
+                              'Main body', 'Attachments'])
+    plt.ylabel('Averaged Attention Weights')
+    plt.savefig(os.path.join(
+        save_folder, f"instance_attention_weights_all.pdf"))
     plt.clf()
 
     with open(os.path.join(
