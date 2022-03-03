@@ -5,39 +5,43 @@ import numpy as np
 import gensim
 from collections import Counter
 
+# Convert the downloaded to required format
+
 
 def gensim_word_emb_to_vectors_and_vocab(path):
     glove = gensim.KeyedVectors.load(path)
     vocab = np.array([word for word in glove.index_to_key])
     vectors = np.array([glove[word] for word in glove.index_to_key])
-    np.save('./lab_iais/data/word_embeddings/glove_attentionXML/vocab.npy', vocab)
-    np.save('./lab_iais/data/word_embeddings/glove_attentionXML/vectors.npy', vectors)
+    np.save('./data/word_embeddings/glove_attentionXML/vocab.npy', vocab)
+    np.save('./data/word_embeddings/glove_attentionXML/vectors.npy', vectors)
 
 
+# Convert the downloaded dataset to the required format for a MIL model
 def eurlex57k_to_extreme_milmlc_format(source_path, target_path, min_example_per_label):
 
     if not os.path.exists(target_path):
         os.makedirs(target_path)
 
-    train_text_rows, train_label_rows, all_train_labels = load_eurlex57k_instances(
+    train_text_rows, train_label_rows, _ = load_eurlex57k_instances(
         source_path, "train")
-    dev_text_rows, dev_label_rows, all_dev_labels = load_eurlex57k_instances(
+    dev_text_rows, dev_label_rows, _ = load_eurlex57k_instances(
         source_path, "dev")
-    test_text_rows, test_label_rows, all_test_labels = load_eurlex57k_instances(
+    test_text_rows, test_label_rows, _ = load_eurlex57k_instances(
         source_path, "test")
 
     labels_to_keep = find_frequent_labels(
         train_label_rows, min_example_per_label)
 
-    train_text_rows, train_label_rows = remove_unfrequent_labels(
+    train_text_rows, train_label_rows = keep_labels(
         train_text_rows, train_label_rows, labels_to_keep)
 
-    dev_text_rows, dev_label_rows = remove_unfrequent_labels(
+    dev_text_rows, dev_label_rows = keep_labels(
         dev_text_rows, dev_label_rows, labels_to_keep)
 
-    test_text_rows, test_label_rows = remove_unfrequent_labels(
+    test_text_rows, test_label_rows = keep_labels(
         test_text_rows, test_label_rows, labels_to_keep)
 
+    # Convert label lists to a string where different labels are seperated by white space
     train_label_rows = [" ".join(label_row) for label_row in train_label_rows]
     dev_label_rows = [" ".join(label_row) for label_row in dev_label_rows]
     test_label_rows = [" ".join(label_row) for label_row in test_label_rows]
@@ -76,30 +80,32 @@ def eurlex57k_to_extreme_milmlc_format(source_path, target_path, min_example_per
             fo.write('\n')
 
 
+# Convert the required model to required format for AttentionXML
 def eurlex57k_to_extreme_mlc_format(source_path, target_path, min_example_per_label):
 
     if not os.path.exists(target_path):
         os.makedirs(target_path)
 
-    train_text_rows, train_label_rows, all_train_labels = load_eurlex57k_texts(
+    train_text_rows, train_label_rows, _ = load_eurlex57k_texts(
         source_path, "train")
-    dev_text_rows, dev_label_rows, all_dev_labels = load_eurlex57k_texts(
+    dev_text_rows, dev_label_rows, _ = load_eurlex57k_texts(
         source_path, "dev")
-    test_text_rows, test_label_rows, all_test_labels = load_eurlex57k_texts(
+    test_text_rows, test_label_rows, _ = load_eurlex57k_texts(
         source_path, "test")
 
     labels_to_keep = find_frequent_labels(
         train_label_rows, min_example_per_label)
 
-    train_text_rows, train_label_rows = remove_unfrequent_labels(
+    train_text_rows, train_label_rows = keep_labels(
         train_text_rows, train_label_rows, labels_to_keep)
 
-    dev_text_rows, dev_label_rows = remove_unfrequent_labels(
+    dev_text_rows, dev_label_rows = keep_labels(
         dev_text_rows, dev_label_rows, labels_to_keep)
 
-    test_text_rows, test_label_rows = remove_unfrequent_labels(
+    test_text_rows, test_label_rows = keep_labels(
         test_text_rows, test_label_rows, labels_to_keep)
 
+    # Convert label lists to a string where different labels are seperated by white space
     train_label_rows = [" ".join(label_row) for label_row in train_label_rows]
     dev_label_rows = [" ".join(label_row) for label_row in dev_label_rows]
     test_label_rows = [" ".join(label_row) for label_row in test_label_rows]
@@ -236,7 +242,8 @@ def find_frequent_labels(train_label_rows, min_example_per_label):
     return labels_to_keep
 
 
-def remove_unfrequent_labels(text_rows, label_rows, labels_to_keep):
+# Helper to only keep labels which are in the set labels_to_keep
+def keep_labels(text_rows, label_rows, labels_to_keep):
 
     new_label_rows = []
     docs_to_delete = set()
@@ -271,10 +278,12 @@ def remove_unfrequent_labels(text_rows, label_rows, labels_to_keep):
 
 
 if __name__ == '__main__':
+    # For AttentionXML model
     # eurlex57k_to_extreme_mlc_format(source_path="./data/datasets/EURLEX57K_original/",
     #                                 target_path="./data/datasets/EURLEX57K_full_min10/",
-    #                                 min_example_per_label=10)
+    #                                 min_example_per_label=0)
 
+    # For MIL model
     eurlex57k_to_extreme_milmlc_format(source_path="./data/datasets/EURLEX57K_original/",
                                        target_path="./data/datasets/EURLEX57K_full_mil_min10/",
-                                       min_example_per_label=10)
+                                       min_example_per_label=0)

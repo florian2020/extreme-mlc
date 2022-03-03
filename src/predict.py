@@ -89,8 +89,9 @@ def analyse_attention_weights(model, save_folder):
 
     plt.boxplot([attention_score.flatten() for attention_score in l], sym='')
     plt.xticks([1, 2, 3, 4], ['Header', 'Recitals',
-                              'Main body', 'Attachments'])
-    plt.ylabel('Averaged Attention Weights')
+                              'Main\nbody', 'Attachments'], fontsize='x-large')
+    plt.yticks(fontsize='large')
+    plt.ylabel('Averaged Attention Weights', fontsize='x-large')
     plt.savefig(os.path.join(
         save_folder, f"instance_attention_weights_all.pdf"))
     plt.clf()

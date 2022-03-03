@@ -219,7 +219,11 @@ class BagAttentionClassifier(nn.Module):
             label_emb = self.label_embed(candidates[0]).unsqueeze(0)
 
         if self.normalize_labels:
-            # (num_bags,num_labels,hidden_dim)
+            # label_emb = F.normalize(
+            #     label_emb, p=2, dim=-1, eps=1e-6)
+            # x = self.att(x, mask, label_emb)
+
+            # # (num_bags,n um_labels,hidden_dim)
             x = self.att(x, mask, F.normalize(
                 label_emb, p=2, dim=-1, eps=1e-6))
         else:

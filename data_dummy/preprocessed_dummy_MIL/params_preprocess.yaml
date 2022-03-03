@@ -1,0 +1,6 @@
+preprocess:
+    dataset_path: './data/datasets/EURLEX57K_full_mil'
+    tokenizer: 'all-MiniLM-L6-v2'
+    max_tokens: 100
+    max_instances: 8
+    concatenate_main_body: False

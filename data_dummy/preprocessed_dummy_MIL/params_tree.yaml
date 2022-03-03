@@ -1,0 +1,4 @@
+label_tree:
+    label_file_path: './data/datasets/EURLEX57K_tiny_mil'
+    group_id_chars: 0
+

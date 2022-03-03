@@ -1,0 +1,4 @@
+preprocess:
+    dataset_path: './data/datasets/EURLEX57K_full'
+    tokenizer: 'spacy'
+    max_tokens: 800

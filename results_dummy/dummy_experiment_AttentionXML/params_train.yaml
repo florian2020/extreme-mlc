@@ -1,0 +1,25 @@
+model:
+    encoder:
+        type: 'lstm'
+        num_layers: 1
+        output_dim: 256
+        dropout: 0.5
+    attention: 
+        type: "softmax-attention"
+    classifier:
+        type: 'mlp'
+        bias: true
+        activation: 'relu' 
+        hidden_layers:
+            - 256
+
+trainer:
+    regime: "levelwise"
+    eval_interval: 150
+    train_batch_size: 45
+    eval_batch_size: 100
+    lr_classifier: 1.0e-3
+    lr_encoder: 1.0e-3
+    num_steps: 20_000
+    num_candidates: null
+    topk: 100
